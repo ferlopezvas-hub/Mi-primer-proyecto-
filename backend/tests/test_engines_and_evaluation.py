@@ -250,3 +250,18 @@ def test_prediction_view_limits_free_plan(client, db, auth, monkeypatch):
     assert [x.status_code for x in r] == [200, 200, 402]
     assert r[0].json()["limited"] is True and "stats_used" not in r[0].json()["predictions"][0]["explanation"]
     assert client.get(f"/api/v1/predictions/match/{ids[0]}", headers=auth).status_code == 200  # ya vista
+
+
+def test_top_picks_shows_track_record(client, db, auth):
+    _seed_league_in_db(db, n_finished_rounds=4)
+    first = db.scalar(select(Match.start_time).order_by(Match.start_time))
+    last = db.scalar(select(Match.start_time).order_by(Match.start_time.desc()))
+    walk_forward(db, Sport.football, first + (last - first) / 2, last + timedelta(days=1))
+    now = datetime.now(UTC)
+    process(db, "fake", [dto(pid="top", start=now + timedelta(hours=5), home="T0", away="T5")])
+    generate_upcoming(db)
+    r = client.get("/api/v1/predictions/top", headers=auth).json()
+    assert "garantías" in r["disclaimer"]
+    for it in r["items"]:
+        assert it["confidence"] >= 0.7
+        assert it["track_record"] is None or set(it["track_record"]) == {"live", "backtest"}

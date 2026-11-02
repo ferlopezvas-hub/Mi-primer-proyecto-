@@ -114,3 +114,30 @@ def test_security_headers_and_health(client):
     assert "X-Request-ID" in r.headers
     ready = client.get("/health/ready").json()
     assert ready["checks"]["database"]["ok"] is True
+
+
+def test_claim_admin_flow(client, auth, monkeypatch):
+    from app.config import get_settings
+
+    assert client.get("/api/v1/auth/setup-status").json() == {"admin_exists": False, "setup_available": False}
+    assert client.post("/api/v1/auth/claim-admin", json={"code": "x"}, headers=auth).status_code == 400
+    monkeypatch.setattr(get_settings(), "admin_setup_code", "codigo-secreto-muy-largo-123")
+    assert client.get("/api/v1/auth/setup-status").json()["setup_available"] is True
+    assert client.post("/api/v1/auth/claim-admin", json={"code": "mal"}, headers=auth).status_code == 403
+    r = client.post("/api/v1/auth/claim-admin", json={"code": "codigo-secreto-muy-largo-123"}, headers=auth)
+    assert r.status_code == 200
+    new = {"Authorization": f"Bearer {r.json()['access_token']}"}
+    assert client.get("/api/v1/me", headers=new).json()["role"] == "admin"
+    assert client.get("/api/v1/admin/users", headers=new).status_code == 200
+    # ya existe un administrador: nadie más puede reclamarlo
+    assert client.post("/api/v1/auth/claim-admin", json={"code": "codigo-secreto-muy-largo-123"},
+                       headers=new).status_code == 409
+
+
+def test_frontend_host_adds_cors_and_links(monkeypatch):
+    from app.config import Settings
+
+    monkeypatch.setenv("FRONTEND_HOST", "sportai-web.onrender.com")
+    s = Settings()
+    assert "https://sportai-web.onrender.com" in s.cors_origins
+    assert s.web_url == "https://sportai-web.onrender.com"

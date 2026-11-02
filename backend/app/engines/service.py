@@ -41,13 +41,20 @@ def load_history(db: Session, sport: Sport, group: str | None, until: datetime, 
     q = (select(Match).options(joinedload(Match.home), joinedload(Match.away), joinedload(Match.competition))
          .where(Match.sport == sport, Match.status == MatchStatus.finished,
                 Match.start_time >= until - timedelta(days=days), Match.start_time < until))
-    out = []
+    out, seen = [], set()
     for m in db.scalars(q).unique().all():
         if sport != Sport.tennis and group is not None and competition_group(m.competition) != group:
             continue
         hm = to_hist(m)
-        if hm:
-            out.append(hm)
+        if hm is None:
+            continue
+        # El mismo partido puede llegar de dos fuentes (p. ej. API-Football y football-data.co.uk):
+        # se cuenta una sola vez.
+        key = (hm.date.date(), hm.home, hm.away)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(hm)
     return out
 
 

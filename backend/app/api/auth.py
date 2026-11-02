@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hmac
 import secrets
 from datetime import UTC, datetime, timedelta
 
@@ -11,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import get_db
 from app.deps import get_current_user
-from app.models import PasswordResetToken, RefreshToken, UsageEvent, User
+from app.models import AuditLog, PasswordResetToken, RefreshToken, Role, UsageEvent, User
 from app.notifications.email import send_email
 from app.plans import get_plan
 from app.ratelimit import auth_rate_limit
@@ -191,7 +192,7 @@ def forgot_password(body: ForgotIn, db: Session = Depends(get_db)):
         db.add(PasswordResetToken(user_id=user.id, token_hash=sha256(raw),
                                   expires_at=_now() + timedelta(minutes=s.password_reset_minutes)))
         db.commit()
-        link = f"{s.public_web_url}/reset-password?token={raw}"
+        link = f"{s.web_url}/reset-password?token={raw}"
         send_email(
             user.email,
             "Recupera tu contraseña - SPORT AI PREDICTOR",
@@ -217,6 +218,33 @@ def reset_password(body: ResetIn, db: Session = Depends(get_db)):
                .values(revoked_at=_now()))
     db.commit()
     return {"detail": "Contraseña actualizada. Ya puedes iniciar sesión."}
+
+
+class ClaimAdminIn(BaseModel):
+    code: str = Field(max_length=200)
+
+
+@router.get("/setup-status")
+def setup_status(db: Session = Depends(get_db)):
+    """Indica si falta crear el primer administrador (sin datos sensibles)."""
+    has_admin = db.scalar(select(User.id).where(User.role == Role.admin).limit(1)) is not None
+    return {"admin_exists": has_admin, "setup_available": bool(get_settings().admin_setup_code) and not has_admin}
+
+
+@router.post("/claim-admin", dependencies=[Depends(auth_rate_limit)])
+def claim_admin(body: ClaimAdminIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    expected = get_settings().admin_setup_code
+    if len(expected) < 16:
+        raise HTTPException(400, "La configuración inicial no está activada en el servidor")
+    if db.scalar(select(User.id).where(User.role == Role.admin).limit(1)) is not None:
+        raise HTTPException(409, "Ya existe un administrador")
+    if not hmac.compare_digest(body.code.strip(), expected):
+        raise HTTPException(403, "Código incorrecto")
+    user.role, user.plan_code = Role.admin, "elite"
+    user.token_version += 1
+    db.add(AuditLog(actor_id=user.id, action="admin.claim", detail={"user_id": user.id}))
+    db.commit()
+    return _issue_tokens(db, user)
 
 
 @router.post("/change-password")

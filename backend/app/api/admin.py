@@ -30,7 +30,7 @@ from app.providers.registry import all_providers
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 ALLOWED_TASKS = {"sync_fixtures", "sync_live", "sync_results", "generate_predictions", "resolve_predictions",
-                 "fanout_events", "check_upcoming"}
+                 "fanout_events", "check_upcoming", "bootstrap_history"}
 
 
 class UserPatch(BaseModel):

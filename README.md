@@ -18,6 +18,7 @@ notificaciones push y predicciones estadísticas **transparentes y auditables**.
 | Datos | Conectores modulares: API-Football, API-Basketball, API-Tennis, football-data.org, históricos de football-data.co.uk | [docs/DATA_PROVIDERS.md](docs/DATA_PROVIDERS.md) |
 | Interfaz | PWA React responsive (iPhone, Android, tablet, escritorio), modo claro/oscuro, panel de administración | `frontend/` |
 | SaaS | Registro, login, recuperación de contraseña, planes Free/Pro/Elite con límites, roles, auditoría, métricas de uso. **Pagos no implementados** (ver [docs/LEGAL.md](docs/LEGAL.md)) | [docs/SECURITY.md](docs/SECURITY.md) |
+| Publicar | **Guía paso a paso sin terminal: [docs/PUBLICAR.md](docs/PUBLICAR.md)** | |
 | Operación | Docker, docker-compose, blueprint de Render, Vercel, copias de seguridad, Prometheus, Sentry, health checks | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), [docs/OPERATIONS.md](docs/OPERATIONS.md) |
 
 ## Arranque rápido (desarrollo)

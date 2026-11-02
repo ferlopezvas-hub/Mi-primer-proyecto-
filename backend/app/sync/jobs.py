@@ -105,6 +105,68 @@ def run_sync_results(db: Session) -> dict:
     return {"providers": report, "event_ids": total.event_ids}
 
 
+def run_bootstrap(db: Session, seasons_back: int = 2) -> dict:
+    """Carga inicial: históricos de los proveedores activos (+ football-data.co.uk), backtest y predicciones.
+
+    Pensada para lanzarse una vez desde Administración → Sistema tras el primer despliegue.
+    Coste en cuota: 1 llamada por liga y temporada en API-Football/API-Basketball.
+    """
+    from app.config import get_settings
+    from app.engines.service import generate_upcoming
+    from app.evaluation.backtest import walk_forward
+    from app.models import Sport
+
+    report: dict = {"providers": {}}
+    now = _now()
+    for p in active_providers():
+        leagues = getattr(p, "leagues", [])
+        done = 0
+        for lid, season in leagues:
+            for back in range(seasons_back + 1):
+                s = _season_minus(season, back)
+                try:
+                    process(db, p, p.history(lid, s), notify=False)
+                    done += 1
+                except QuotaExceededError:
+                    break
+                except ProviderError as exc:
+                    db.rollback()
+                    report["providers"].setdefault(p.name, {})["error"] = str(exc)
+        report["providers"].setdefault(p.name, {})["league_seasons"] = done
+    try:
+        import httpx
+
+        from app.providers.football_data_uk import PROVIDER, download, parse_csv
+
+        client = httpx.Client(timeout=30, follow_redirects=True)
+        y = now.year if now.month >= 7 else now.year - 1
+        n = 0
+        for div in [d for d in get_settings().history_divisions.split(",") if d.strip()]:
+            for yy in range(y - seasons_back - 1, y + 1):
+                code = f"{yy % 100:02d}{(yy + 1) % 100:02d}"
+                try:
+                    text = download(div.strip(), code, client)
+                except httpx.HTTPError:
+                    continue
+                process(db, PROVIDER, parse_csv(text, div.strip(), str(yy)), notify=False)
+                n += 1
+        report["football_data_co_uk_files"] = n
+    except Exception as exc:  # noqa: BLE001 - la fuente opcional no debe romper la carga
+        report["football_data_co_uk_error"] = str(exc)[:200]
+    report["backtest"] = walk_forward(db, Sport.football, now.replace(year=now.year - 1), now)
+    report["predictions"] = generate_upcoming(db)
+    return report
+
+
+def _season_minus(season: str, n: int) -> str:
+    """'2026' -> '2025'; '2026-2027' -> '2025-2026'."""
+    parts = season.split("-")
+    try:
+        return "-".join(str(int(x) - n) for x in parts)
+    except ValueError:
+        return season
+
+
 def run_cleanup(db: Session) -> dict:
     now = _now()
     a = db.execute(delete(UsageEvent).where(UsageEvent.created_at < now - timedelta(days=400))).rowcount

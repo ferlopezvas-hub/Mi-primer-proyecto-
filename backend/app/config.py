@@ -51,6 +51,8 @@ class Settings(BaseSettings):
     api_football_leagues: str = "140:2026,39:2026,2:2026"
     api_basketball_leagues: str = "12:2026-2027,120:2026-2027"
     fixture_horizon_days: int = 7
+    # Divisiones de football-data.co.uk para la carga inicial de históricos (vacío = no usar)
+    history_divisions: str = "SP1,E0,I1,D1,F1"
 
     # --- Planificación 24/7 (segundos) ---
     live_poll_seconds: int = 60
@@ -77,9 +79,26 @@ class Settings(BaseSettings):
     # --- Modelos ---
     accuracy_target: float = 0.70  # objetivo experimental, nunca se fuerza
 
+    # Dominio del frontend sin "https://" (Render lo rellena solo). Se añade a CORS y a los enlaces de email.
+    frontend_host: str = ""
+    # Código secreto para que la primera persona que lo introduzca se convierta en administradora.
+    # Solo funciona mientras no exista ningún administrador.
+    admin_setup_code: str = ""
+
     @property
     def cors_origins(self) -> list[str]:
-        return [o.strip() for o in self.cors_origins_raw.split(",") if o.strip()]
+        out = [o.strip() for o in self.cors_origins_raw.split(",") if o.strip()]
+        if self.frontend_host:
+            host = self.frontend_host.strip()
+            out.append(host if host.startswith("http") else f"https://{host}")
+        return out
+
+    @property
+    def web_url(self) -> str:
+        if self.frontend_host and self.public_web_url == "http://localhost:5173":
+            host = self.frontend_host.strip()
+            return host if host.startswith("http") else f"https://{host}"
+        return self.public_web_url
 
     @model_validator(mode="after")
     def _normalize_db_url(self):

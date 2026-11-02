@@ -6,9 +6,13 @@ import { ProbabilityBar } from "../components/ProbabilityBar";
 import { Badge, Card, Empty, ErrorBox, PageHeader, Spinner, Stat } from "../components/ui";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { ago, pct } from "../lib/format";
+import { ago, outcomeLabel, pct } from "../lib/format";
 import type { Evaluation, Match, Notification } from "../lib/types";
 
+interface Record_ { n: number; hits: number; accuracy: number | null }
+interface TopResp { threshold: number; disclaimer: string; items: { match: Match; market: string; market_label: string;
+  probabilities: Record<string, number>; predicted_outcome: string; confidence: number;
+  track_record: { live: Record_ | null; backtest: Record_ | null } | null }[] }
 interface Upcoming { match: Match; market: string; probabilities: Record<string, number>; predicted_outcome: string; confidence: number; confidence_label: string; data_quality_level: string }
 
 export function Dashboard() {
@@ -20,6 +24,7 @@ export function Dashboard() {
   const evalQ = useQuery({ queryKey: ["evaluation", "live"], queryFn: () => api<Evaluation>("/evaluation?mode=live") });
   const backQ = useQuery({ queryKey: ["evaluation", "backtest"], queryFn: () => api<Evaluation>("/evaluation?mode=backtest") });
   const bt = backQ.data?.by_market["football:1x2"];
+  const top = useQuery({ queryKey: ["top"], queryFn: () => api<TopResp>("/predictions/top?limit=6") });
   const notes = useQuery({ queryKey: ["notifications", "recent"], queryFn: () => api<{ items: Notification[]; unread: number }>("/notifications?limit=5") });
 
   const ev = evalQ.data;
@@ -40,6 +45,27 @@ export function Dashboard() {
             {live.isLoading ? <Spinner /> : live.error ? <ErrorBox error={live.error} /> : !live.data?.length ? (
               <Empty icon={<Radio className="h-8 w-8" />} title="No hay partidos en juego ahora mismo" text="Los marcadores se actualizan solos cada minuto, también con la app cerrada (las notificaciones te avisarán)." />
             ) : <div className="grid gap-3 sm:grid-cols-2">{live.data.slice(0, 4).map((m) => <MatchCard key={m.id} m={m} />)}</div>}
+          </Card>
+
+          <Card title="Mayor confianza del modelo">
+            <p className="mb-3 text-sm text-ink-2">{top.data?.disclaimer ?? "Estimaciones estadísticas, no garantías."}</p>
+            {top.isLoading ? <Spinner /> : top.error ? <ErrorBox error={top.error} /> : !top.data?.items.length ? (
+              <Empty title="Ningún partido próximo con confianza alta" text="Cuando el modelo tenga confianza alta en un partido de las próximas 72 h, aparecerá aquí." />
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {top.data.items.map((t) => {
+                  const rec = t.track_record?.live?.n ? { ...t.track_record.live, label: "predicciones nuevas" } : t.track_record?.backtest ? { ...t.track_record.backtest, label: "prueba histórica" } : null;
+                  return (
+                    <MatchCard key={`${t.match.id}-${t.market}`} m={t.match} extra={
+                      <div className="space-y-2 text-sm">
+                        <p><span className="text-ink-2">{t.market_label}:</span> <b>{outcomeLabel(t.market, t.predicted_outcome, t.match)}</b> · {pct(t.probabilities[t.predicted_outcome])}</p>
+                        <p className="text-xs text-ink-2">{rec ? <>Con confianza alta, este mercado acertó el <b className="text-ink">{pct(rec.accuracy, 1)}</b> ({rec.hits} de {rec.n}, {rec.label}).</> : "Aún sin historial suficiente para este mercado."}</p>
+                      </div>
+                    } />
+                  );
+                })}
+              </div>
+            )}
           </Card>
 
           <Card title="Próximas predicciones" action={<Link to="/predictions" className="text-sm text-brand">Historial</Link>}>

@@ -1,14 +1,16 @@
-# Blueprint de Render (alternativa gestionada a docker-compose).
-# Crea: API web, worker, beat (1 instancia), PostgreSQL y Redis (Key Value).
-# Tras crearlo, rellena en el panel las variables marcadas "sync: false".
+# Blueprint de Render: publica TODO (web, API, worker 24/7, PostgreSQL y Redis) en un paso.
+# Guía paso a paso: docs/PUBLICAR.md
+# Precios orientativos (confirmar en render.com/pricing): API starter + worker starter + Postgres básico
+# + Key Value starter. La web estática es gratuita.
 envVarGroups:
-  - name: sportai-shared
+  - name: sportai-secrets
     envVars:
       - { key: ENVIRONMENT, value: production }
       - { key: JWT_SECRET, generateValue: true }
-      - { key: CORS_ORIGINS, sync: false }
-      - { key: PUBLIC_WEB_URL, sync: false }
+      - { key: ADMIN_SETUP_CODE, generateValue: true }   # cópialo del panel para hacerte administrador
       - { key: API_FOOTBALL_KEY, sync: false }
+      - { key: API_FOOTBALL_DAILY_QUOTA, value: "7500" }
+      - { key: API_FOOTBALL_LEAGUES, value: "140:2026,39:2026,135:2026,78:2026,61:2026,2:2026" }
       - { key: API_BASKETBALL_KEY, sync: false }
       - { key: API_TENNIS_KEY, sync: false }
       - { key: FOOTBALL_DATA_ORG_KEY, sync: false }
@@ -18,6 +20,7 @@ envVarGroups:
       - { key: SMTP_HOST, sync: false }
       - { key: SMTP_USER, sync: false }
       - { key: SMTP_PASSWORD, sync: false }
+      - { key: SMTP_FROM, sync: false }
       - { key: SENTRY_DSN, sync: false }
       - { key: ALERT_WEBHOOK_URL, sync: false }
 
@@ -25,37 +28,54 @@ services:
   - type: web
     name: sportai-api
     runtime: docker
+    plan: starter
     rootDir: backend
-    healthCheckPath: /health/ready
+    healthCheckPath: /health/live
     envVars:
       - { key: ROLE, value: api }
+      - { key: WEB_CONCURRENCY, value: "2" }
       - { key: DATABASE_URL, fromDatabase: { name: sportai-db, property: connectionString } }
       - { key: REDIS_URL, fromService: { type: keyvalue, name: sportai-redis, property: connectionString } }
-      - { fromGroup: sportai-shared }
+      - { key: FRONTEND_HOST, fromService: { type: web, name: sportai-web, property: host } }
+      - { fromGroup: sportai-secrets }
+
   - type: worker
     name: sportai-worker
     runtime: docker
+    plan: starter
     rootDir: backend
+    numInstances: 1          # worker + planificador juntos: siempre 1 instancia
     envVars:
-      - { key: ROLE, value: worker }
+      - { key: ROLE, value: worker-beat }
       - { key: DATABASE_URL, fromDatabase: { name: sportai-db, property: connectionString } }
       - { key: REDIS_URL, fromService: { type: keyvalue, name: sportai-redis, property: connectionString } }
-      - { fromGroup: sportai-shared }
-  - type: worker
-    name: sportai-beat
-    runtime: docker
-    rootDir: backend
-    numInstances: 1
+      - { key: FRONTEND_HOST, fromService: { type: web, name: sportai-web, property: host } }
+      - { fromGroup: sportai-secrets }
+
+  - type: web
+    name: sportai-web
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
     envVars:
-      - { key: ROLE, value: beat }
-      - { key: DATABASE_URL, fromDatabase: { name: sportai-db, property: connectionString } }
-      - { key: REDIS_URL, fromService: { type: keyvalue, name: sportai-redis, property: connectionString } }
-      - { fromGroup: sportai-shared }
+      - { key: VITE_API_HOST, fromService: { type: web, name: sportai-api, property: host } }
+    headers:
+      - { path: /sw.js, name: Cache-Control, value: no-cache }
+      - { path: /assets/*, name: Cache-Control, value: "public, max-age=31536000, immutable" }
+      - { path: /*, name: X-Content-Type-Options, value: nosniff }
+      - { path: /*, name: X-Frame-Options, value: DENY }
+      - { path: /*, name: Referrer-Policy, value: strict-origin-when-cross-origin }
+    routes:
+      - { type: rewrite, source: /*, destination: /index.html }
+
   - type: keyvalue
     name: sportai-redis
+    plan: starter
     maxmemoryPolicy: noeviction
     ipAllowList: []
 
 databases:
   - name: sportai-db
     databaseName: sportai
+    plan: basic-256mb

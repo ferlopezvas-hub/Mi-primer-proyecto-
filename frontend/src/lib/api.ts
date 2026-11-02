@@ -1,4 +1,6 @@
-const BASE = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "") ?? "";
+// VITE_API_URL (URL completa) o VITE_API_HOST (solo el dominio, como lo entrega Render). Vacío = mismo origen.
+const HOST = import.meta.env.VITE_API_HOST as string | undefined;
+const BASE = ((import.meta.env.VITE_API_URL as string | undefined) ?? (HOST ? `https://${HOST}` : "")).replace(/\/$/, "");
 const ACCESS = "sportai.access";
 const REFRESH = "sportai.refresh";
 

@@ -8,6 +8,10 @@ case "$ROLE" in
   worker)
     exec celery -A app.worker.celery_app worker -Q default,live,notifications --concurrency "${WORKER_CONCURRENCY:-2}" -l info
     ;;
+  worker-beat)
+    # Worker y planificador en un mismo proceso (ahorra un servicio). Usar UNA sola instancia.
+    exec celery -A app.worker.celery_app worker -B -Q default,live,notifications --concurrency "${WORKER_CONCURRENCY:-2}" -l info --schedule /tmp/celerybeat-schedule
+    ;;
   beat)
     # ¡Solo UNA instancia de beat! Si hubiera dos, las tareas se programarían por duplicado.
     exec celery -A app.worker.celery_app beat -l info --schedule /tmp/celerybeat-schedule

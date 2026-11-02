@@ -58,6 +58,10 @@ export function ProfilePage() {
   const changePw = useMutation({ mutationFn: () => api("/auth/change-password", { method: "POST", body: pw }),
     onSuccess: (t: any) => { import("../lib/api").then(({ tokens }) => tokens.set(t.access_token, t.refresh_token)); setPw({ current_password: "", new_password: "" }); setMsg("Contraseña cambiada. Se cerraron las demás sesiones."); } });
   const unfollow = useMutation({ mutationFn: (id: number) => api(`/me/follows/${id}`, { method: "DELETE" }), onSuccess: () => qc.invalidateQueries({ queryKey: ["follows"] }) });
+  const setup = useQuery({ queryKey: ["setup"], queryFn: () => api<{ admin_exists: boolean; setup_available: boolean }>("/auth/setup-status", { auth: false }) });
+  const [code, setCode] = useState("");
+  const claim = useMutation({ mutationFn: () => api("/auth/claim-admin", { method: "POST", body: { code } }),
+    onSuccess: async (t: any) => { const { tokens } = await import("../lib/api"); tokens.set(t.access_token, t.refresh_token); await reload(); setMsg("Ya eres administrador."); } });
   const del = useMutation({ mutationFn: (password: string) => api("/me", { method: "DELETE", body: { password } }), onSuccess: () => logout() });
   if (!user) return null;
   return (
@@ -100,6 +104,16 @@ export function ProfilePage() {
             ))}</ul>
           )}
         </Card>
+        {setup.data?.setup_available && user.role !== "admin" && (
+          <Card title="Configuración inicial">
+            <p className="mb-3 text-sm text-ink-2">Aún no hay administrador. Pega el código <b>ADMIN_SETUP_CODE</b> que aparece en el panel de tu servidor para convertir esta cuenta en la de administración. Solo funciona una vez.</p>
+            <form className="flex flex-wrap gap-2" onSubmit={(e) => { e.preventDefault(); claim.mutate(); }}>
+              <input id="setupcode" className="input flex-1" value={code} onChange={(e) => setCode(e.target.value)} placeholder="Código de configuración" aria-label="Código de configuración" required />
+              <button className="btn-primary" disabled={claim.isPending}>Activar</button>
+            </form>
+            {claim.error && <div className="mt-2"><ErrorBox error={claim.error} /></div>}
+          </Card>
+        )}
         <Card title="Seguridad">
           <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); changePw.mutate(); }}>
             <div><label className="label" htmlFor="cp">Contraseña actual</label><input id="cp" type="password" className="input" autoComplete="current-password" value={pw.current_password} onChange={(e) => setPw({ ...pw, current_password: e.target.value })} required /></div>

@@ -80,6 +80,53 @@ def upcoming(sport: Sport | None = None, limit: int = Query(30, le=100), _: User
              "data_quality_level": (p.data_quality or {}).get("level")} for p in rows]
 
 
+HIGH_CONFIDENCE = 0.7
+
+
+def track_record(db: Session) -> dict[tuple[str, str], dict]:
+    """Acierto real de las predicciones resueltas con confianza alta, por deporte y mercado."""
+    from sqlalchemy import case, func
+
+    rows = db.execute(
+        select(Prediction.sport, Prediction.market, func.count(),
+               func.sum(case((Prediction.is_correct.is_(True), 1), else_=0)), Prediction.is_backtest)
+        .where(Prediction.resolved_at.is_not(None), Prediction.is_correct.is_not(None),
+               Prediction.confidence >= HIGH_CONFIDENCE)
+        .group_by(Prediction.sport, Prediction.market, Prediction.is_backtest)
+    ).all()
+    out: dict[tuple[str, str], dict] = {}
+    for sport, market, n, hits, is_bt in rows:
+        rec = out.setdefault((sport.value, market), {"live": None, "backtest": None})
+        rec["backtest" if is_bt else "live"] = {"n": n, "hits": int(hits or 0),
+                                                "accuracy": round((hits or 0) / n, 4) if n else None}
+    return out
+
+
+@router.get("/top")
+def top_picks(limit: int = Query(10, le=50), user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Próximos partidos con confianza alta. No es una garantía: se muestra el acierto real
+    histórico de ese nivel de confianza para que el usuario lo valore."""
+    now = datetime.now(UTC)
+    q = (select(Prediction).join(Match).options(joinedload(Prediction.match).joinedload(Match.home),
+                                                 joinedload(Prediction.match).joinedload(Match.away),
+                                                 joinedload(Prediction.match).joinedload(Match.competition))
+         .where(Prediction.is_backtest.is_(False), Match.status == MatchStatus.scheduled, Match.start_time > now,
+                Prediction.confidence >= HIGH_CONFIDENCE)
+         .order_by(Prediction.confidence.desc(), Match.start_time).limit(limit))
+    rows = db.scalars(q).unique().all()
+    records = track_record(db)
+    return {
+        "threshold": HIGH_CONFIDENCE,
+        "disclaimer": ("Estimaciones estadísticas, no garantías. Ningún modelo asegura aciertos: compara siempre "
+                       "con el acierto real histórico que se muestra en cada caso."),
+        "items": [{"match": match_out(p.match), "market": p.market,
+                   "market_label": MARKET_LABELS.get(p.market, p.market),
+                   "probabilities": p.probabilities, "predicted_outcome": p.predicted_outcome,
+                   "confidence": p.confidence, "track_record": records.get((p.sport.value, p.market))}
+                  for p in rows],
+    }
+
+
 @router.get("/history")
 def history(
     sport: Sport | None = None,

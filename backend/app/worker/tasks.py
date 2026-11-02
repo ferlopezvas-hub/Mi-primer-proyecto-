@@ -138,6 +138,11 @@ def resolve_predictions():
     return tracked("resolve_predictions", 900)(lambda db: {"resolved": resolve_pending(db)})()
 
 
+@celery.task(name="app.worker.tasks.bootstrap_history", time_limit=3 * 3600, soft_time_limit=3 * 3600 - 60)
+def bootstrap_history():
+    return tracked("bootstrap_history", 3 * 3600)(jobs.run_bootstrap)()
+
+
 @celery.task(name="app.worker.tasks.cleanup")
 def cleanup():
     return tracked("cleanup", 3600)(jobs.run_cleanup)()

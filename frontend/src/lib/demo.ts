@@ -51,6 +51,7 @@ export async function demoApi<T>(path: string, opts: { method?: string; body?: a
   const sport = q.get("sport");
 
   // ---------------------------------------------------------------- auth
+  if (p === "/auth/setup-status") return { admin_exists: true, setup_available: false } as T;
   if (p.startsWith("/auth/")) {
     if (p === "/auth/login" || p === "/auth/refresh" || p === "/auth/change-password")
       return { access_token: "demo", refresh_token: "demo", token_type: "bearer", expires_in: 3600 } as T;
@@ -169,6 +170,8 @@ export async function demoApi<T>(path: string, opts: { method?: string; body?: a
     return r;
   }
   if (p === "/predictions/upcoming") return [] as T;
+  if (p === "/predictions/top") return { threshold: 0.7, items: [],
+    disclaimer: "Estimaciones estadísticas, no garantías. En la demo no hay partidos próximos." } as T;
   if (p === "/predictions/history") {
     const state = q.get("state") ?? "all";
     const includeBacktest = q.get("include_backtest") === "true";

@@ -18,6 +18,15 @@ _ALIASES = {
     "wolverhampton", "newcastle united": "newcastle", "west ham united": "west ham", "brighton hove albion":
     "brighton", "sheffield united": "sheffield utd", "sheffield united fc": "sheffield utd",
     "leicester city": "leicester", "leeds united": "leeds", "ipswich town": "ipswich", "luton town": "luton",
+    # API-Football -> football-data.co.uk (para unir históricos de ambas fuentes)
+    "bayern munchen": "bayern munich", "paris saint germain": "paris sg", "borussia dortmund": "dortmund",
+    "borussia monchengladbach": "m gladbach", "eintracht frankfurt": "ein frankfurt", "olympique marseille":
+    "marseille", "olympique lyonnais": "lyon", "as roma": "roma", "ss lazio": "lazio", "ssc napoli": "napoli",
+    "deportivo alaves": "alaves", "athletic bilbao club": "athletic", "atletico de madrid": "atletico madrid",
+    "rb leipzig": "rb leipzig", "1899 hoffenheim": "hoffenheim", "vfb stuttgart": "stuttgart",
+    "bayer leverkusen": "leverkusen", "vfl wolfsburg": "wolfsburg", "1 koln": "koln", "1 fc koln": "koln",
+    "fc koln": "koln", "stade rennais": "rennes", "as monaco": "monaco", "stade brestois 29": "brest",
+    "hellas verona": "verona", "racing santander": "santander", "real racing club": "santander",
 }
 
 

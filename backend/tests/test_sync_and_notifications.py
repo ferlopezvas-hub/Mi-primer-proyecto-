@@ -262,3 +262,31 @@ def test_push_subscription_api(client, auth):
     assert client.post("/api/v1/me/push-subscriptions", headers=auth, json=body).status_code == 201
     assert client.post("/api/v1/me/push-subscriptions", headers=auth,
                        json={**body, "endpoint": "http://insecure"}).status_code == 400
+
+
+def test_bootstrap_loads_history_and_dedupes_sources(db, monkeypatch):
+    from app.config import get_settings
+    from app.engines.service import load_history
+
+    monkeypatch.setattr(get_settings(), "history_divisions", "")  # sin red en las pruebas
+
+    class Hist(FakeProvider):
+        leagues = [("140", "2026")]
+
+        def history(self, lid, season):
+            self.calls.append(f"history:{lid}:{season}")
+            start = datetime(int(season), 9, 1, tzinfo=UTC)
+            return [dto(pid=f"{season}-{i}", start=start + timedelta(days=i), status=MatchStatus.finished,
+                        detail="FT", hs=i % 3, as_=1) for i in range(3)]
+
+    p = Hist()
+    set_providers([p])
+    out = jobs.run_bootstrap(db, seasons_back=2)
+    assert [c for c in p.calls if c.startswith("history")] == ["history:140:2026", "history:140:2025",
+                                                               "history:140:2024"]
+    assert out["providers"]["fake"]["league_seasons"] == 3
+    # el mismo partido llegado desde otra fuente no se cuenta dos veces
+    process(db, "otra-fuente", [dto(pid="dup", start=datetime(2026, 9, 1, tzinfo=UTC),
+                                    status=MatchStatus.finished, detail="FT", hs=0, as_=1)], notify=False)
+    hist = load_history(db, Sport.football, "la liga", datetime(2027, 1, 1, tzinfo=UTC))
+    assert len(hist) == 9

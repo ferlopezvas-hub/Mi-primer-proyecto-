@@ -105,6 +105,11 @@ function System() {
         )}
       </Card>
       <Card title="Tareas en segundo plano" action={jobs.data && <Badge>{jobs.data.live_matches} partidos en directo</Badge>}>
+        <div className="mb-4 rounded-xl border border-line p-3 text-sm">
+          <p className="font-medium">Carga inicial de datos</p>
+          <p className="mb-2 text-ink-2">Descarga 2-3 temporadas de históricos de las ligas configuradas, calcula la prueba histórica y genera las predicciones. Hazlo una vez tras publicar (tarda unos minutos).</p>
+          <button className="btn-primary" onClick={() => run.mutate("bootstrap_history")} disabled={run.isPending}>Cargar históricos y predicciones</button>
+        </div>
         <div className="mb-4 flex flex-wrap gap-2">{TASKS.map((t) => (
           <button key={t} className="btn-ghost min-h-[36px] px-3 py-1" onClick={() => run.mutate(t)}><Play className="h-3.5 w-3.5" />{t}</button>
         ))}</div>
