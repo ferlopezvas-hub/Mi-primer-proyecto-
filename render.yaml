@@ -1,0 +1,61 @@
+# Blueprint de Render (alternativa gestionada a docker-compose).
+# Crea: API web, worker, beat (1 instancia), PostgreSQL y Redis (Key Value).
+# Tras crearlo, rellena en el panel las variables marcadas "sync: false".
+envVarGroups:
+  - name: sportai-shared
+    envVars:
+      - { key: ENVIRONMENT, value: production }
+      - { key: JWT_SECRET, generateValue: true }
+      - { key: CORS_ORIGINS, sync: false }
+      - { key: PUBLIC_WEB_URL, sync: false }
+      - { key: API_FOOTBALL_KEY, sync: false }
+      - { key: API_BASKETBALL_KEY, sync: false }
+      - { key: API_TENNIS_KEY, sync: false }
+      - { key: FOOTBALL_DATA_ORG_KEY, sync: false }
+      - { key: VAPID_PUBLIC_KEY, sync: false }
+      - { key: VAPID_PRIVATE_KEY, sync: false }
+      - { key: VAPID_SUBJECT, sync: false }
+      - { key: SMTP_HOST, sync: false }
+      - { key: SMTP_USER, sync: false }
+      - { key: SMTP_PASSWORD, sync: false }
+      - { key: SENTRY_DSN, sync: false }
+      - { key: ALERT_WEBHOOK_URL, sync: false }
+
+services:
+  - type: web
+    name: sportai-api
+    runtime: docker
+    rootDir: backend
+    healthCheckPath: /health/ready
+    envVars:
+      - { key: ROLE, value: api }
+      - { key: DATABASE_URL, fromDatabase: { name: sportai-db, property: connectionString } }
+      - { key: REDIS_URL, fromService: { type: keyvalue, name: sportai-redis, property: connectionString } }
+      - { fromGroup: sportai-shared }
+  - type: worker
+    name: sportai-worker
+    runtime: docker
+    rootDir: backend
+    envVars:
+      - { key: ROLE, value: worker }
+      - { key: DATABASE_URL, fromDatabase: { name: sportai-db, property: connectionString } }
+      - { key: REDIS_URL, fromService: { type: keyvalue, name: sportai-redis, property: connectionString } }
+      - { fromGroup: sportai-shared }
+  - type: worker
+    name: sportai-beat
+    runtime: docker
+    rootDir: backend
+    numInstances: 1
+    envVars:
+      - { key: ROLE, value: beat }
+      - { key: DATABASE_URL, fromDatabase: { name: sportai-db, property: connectionString } }
+      - { key: REDIS_URL, fromService: { type: keyvalue, name: sportai-redis, property: connectionString } }
+      - { fromGroup: sportai-shared }
+  - type: keyvalue
+    name: sportai-redis
+    maxmemoryPolicy: noeviction
+    ipAllowList: []
+
+databases:
+  - name: sportai-db
+    databaseName: sportai

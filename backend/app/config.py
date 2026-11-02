@@ -82,6 +82,14 @@ class Settings(BaseSettings):
         return [o.strip() for o in self.cors_origins_raw.split(",") if o.strip()]
 
     @model_validator(mode="after")
+    def _normalize_db_url(self):
+        # Los proveedores gestionados (Render, Heroku, Neon...) entregan postgres:// o postgresql://
+        for prefix in ("postgres://", "postgresql://"):
+            if self.database_url.startswith(prefix):
+                self.database_url = "postgresql+psycopg://" + self.database_url[len(prefix):]
+        return self
+
+    @model_validator(mode="after")
     def _check_production(self):
         if self.environment == "production":
             if self.jwt_secret.startswith("dev-only") or len(self.jwt_secret) < 32:

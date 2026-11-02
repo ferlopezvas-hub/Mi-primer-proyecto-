@@ -1,0 +1,83 @@
+# Despliegue completo en un servidor (VPS). Uso:
+#   cp .env.example .env   # y rellena los valores
+#   docker compose up -d --build
+# Todos los servicios se reinician solos si fallan o si el servidor se reinicia.
+x-backend: &backend
+  build: ./backend
+  env_file: .env
+  environment:
+    DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-sportai}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-sportai}
+    REDIS_URL: redis://redis:6379/0
+  restart: unless-stopped
+  depends_on:
+    db: { condition: service_healthy }
+    redis: { condition: service_healthy }
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sportai}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}
+      POSTGRES_DB: ${POSTGRES_DB:-sportai}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sportai}"]
+      interval: 10s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes: [redisdata:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      retries: 5
+
+  api:
+    <<: *backend
+    environment:
+      ROLE: api
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-sportai}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-sportai}
+      REDIS_URL: redis://redis:6379/0
+    ports: ["127.0.0.1:8000:8000"]   # detrás de un proxy inverso con HTTPS (Caddy/Nginx)
+
+  worker:
+    <<: *backend
+    environment:
+      ROLE: worker
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-sportai}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-sportai}
+      REDIS_URL: redis://redis:6379/0
+    depends_on: { api: { condition: service_started } }
+
+  beat:
+    <<: *backend
+    environment:
+      ROLE: beat
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-sportai}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-sportai}
+      REDIS_URL: redis://redis:6379/0
+    depends_on: { api: { condition: service_started } }
+
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-sportai}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-sportai}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+    volumes: ["./backups:/backups", "./backend/scripts/backup.sh:/backup.sh:ro"]
+    entrypoint: ["sh", "-c", "while true; do sh /backup.sh || echo 'BACKUP FALLIDO'; sleep 86400; done"]
+    depends_on: { db: { condition: service_healthy } }
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment: { API_DOMAIN: "${API_DOMAIN:-localhost}" }
+    command: caddy reverse-proxy --from ${API_DOMAIN:-localhost} --to api:8000
+    volumes: [caddydata:/data]
+    depends_on: [api]
+
+volumes: { pgdata: {}, redisdata: {}, caddydata: {} }

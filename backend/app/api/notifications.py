@@ -10,6 +10,7 @@ from app.config import get_settings
 from app.db import get_db
 from app.deps import get_current_user
 from app.models import User, UserNotification
+from app.ratelimit import anon_rate_limit
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
@@ -49,7 +50,7 @@ def mark_all_read(user: User = Depends(get_current_user), db: Session = Depends(
     db.commit()
 
 
-@router.get("/vapid-public-key")
+@router.get("/vapid-public-key", dependencies=[Depends(anon_rate_limit)])
 def vapid_public_key():
     key = get_settings().vapid_public_key
     return {"key": key or None, "enabled": bool(key)}

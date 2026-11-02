@@ -15,3 +15,8 @@ def test_production_requires_strong_secret(monkeypatch):
         Settings()
     monkeypatch.setenv("JWT_SECRET", "x" * 48)
     assert Settings().environment == "production"
+
+
+def test_database_url_normalized(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "postgres://u:p@h:5432/db")
+    assert Settings().database_url == "postgresql+psycopg://u:p@h:5432/db"
