@@ -11,3 +11,5 @@ dist/
 .vercel/
 backups/
 *.sqlite3
+celerybeat-schedule*
+dump.rdb
