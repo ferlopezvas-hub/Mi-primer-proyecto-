@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Entornos virtuales
+.venv/
+venv/
+env/
+
+# Herramientas
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.ipynb_checkpoints/
+
+# Secretos (NUNCA versionar)
+.env
+
+# Datos y registros locales
+data/*
+!data/.gitkeep
+logs/*
+!logs/.gitkeep
+
+# Sistema / editores
+.DS_Store
+.vscode/
+.idea/

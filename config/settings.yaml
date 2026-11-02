@@ -1,0 +1,29 @@
+# Configuración principal del bot.
+# Los secretos (claves de API) van en .env, nunca aquí.
+
+exchange:
+  id: binance          # Cualquier id soportado por ccxt: binance, kraken, bybit...
+  sandbox: true        # Usa la testnet del exchange en modo live (si existe)
+
+trading:
+  symbol: BTC/USDT
+  timeframe: 1h        # 1m, 5m, 15m, 1h, 4h, 1d...
+  mode: paper          # paper (simulado) | live (dinero real). Sobrescribible con TRADING_MODE
+  paper_initial_cash: 10000.0
+
+strategy:
+  name: sma_crossover
+  params:
+    fast: 20
+    slow: 50
+
+risk:
+  risk_per_trade: 0.01       # Arriesga el 1% del capital por operación
+  stop_loss_pct: 0.02        # Stop-loss al 2% por debajo del precio de entrada
+  max_position_pct: 0.25     # Una posición nunca supera el 25% del capital
+  max_daily_loss_pct: 0.03   # Deja de abrir operaciones si se pierde un 3% en el día
+
+backtest:
+  initial_capital: 10000.0
+  fee_rate: 0.001            # Comisión por operación (0.1%)
+  candles: 1000              # Velas históricas a descargar
