@@ -94,6 +94,24 @@ Acierto por nivel de confianza (backtest):
   comercial integrado. En cuanto se conecte API-Basketball o API-Tennis, `python -m app.cli backtest --sport basketball …`
   produce el mismo informe.
 
+## Rentabilidad simulada con cuotas reales
+
+Acertar no equivale a ganar dinero: depende de la cuota. Simulación con apuesta fija de 1 unidad a cada predicción del
+backtest, usando la **cuota media del mercado** previa al partido que publica football-data.co.uk (mismo período y ligas):
+
+| Estrategia | Apuestas | Beneficio | ROI |
+|---|---|---|---|
+| 1X2 · todas | 5.526 | −169,9 u | **−3,1 %** |
+| 1X2 · solo confianza alta | 2.147 | −38,0 u | **−1,8 %** |
+| 1X2 · "valor" (prob. × cuota > 1,05) | 1.545 | −134,7 u | −8,7 % |
+| 1X2 · valor y confianza alta | 510 | −25,1 u | −4,9 % |
+| Más/Menos 2,5 · todas | 5.526 | −238,9 u | −4,3 % |
+| Más/Menos 2,5 · confianza alta | 1.232 | −61,8 u | −5,0 % |
+
+**Ninguna estrategia es rentable.** La confianza alta acierta más (65,7 %), pero son sobre todo favoritos con cuotas
+bajas, y el margen de las casas de apuestas se come la ventaja. El modelo no supera al mercado de apuestas, así que
+la app **no debe venderse ni usarse como sistema de apuestas ganadoras**.
+
 ## Mejoras previstas (por orden de impacto esperado)
 
 1. Calibración posterior (isotónica/Platt) entrenada en temporadas pasadas para corregir la sobreconfianza en Más/Menos y Ambos marcan.
