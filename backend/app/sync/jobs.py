@@ -167,6 +167,32 @@ def _season_minus(season: str, n: int) -> str:
         return season
 
 
+def run_live_stats(db: Session) -> dict:
+    """Estadísticas de los partidos en juego (solo proveedores que las ofrecen, p. ej. API-Football)."""
+    from app.models import Team
+
+    out = {}
+    for p in active_providers():
+        if not hasattr(p, "statistics"):
+            continue
+        live = db.scalars(select(Match).where(Match.provider == p.name, Match.status == MatchStatus.live)).all()
+        n = 0
+        for m in live:
+            home = db.get(Team, m.home_id)
+            try:
+                st = p.statistics(m.provider_id, home.provider_id)
+            except QuotaExceededError:
+                break
+            except ProviderError as exc:
+                out.setdefault("errors", []).append(str(exc)[:120])
+                continue
+            m.stats = {**(m.stats or {}), "live": {**st, "updated_at": _now().isoformat(), "minute": m.elapsed}}
+            n += 1
+        db.commit()
+        out[p.name] = n
+    return out
+
+
 def run_cleanup(db: Session) -> dict:
     now = _now()
     a = db.execute(delete(UsageEvent).where(UsageEvent.created_at < now - timedelta(days=400))).rowcount

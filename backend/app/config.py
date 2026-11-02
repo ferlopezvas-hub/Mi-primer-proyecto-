@@ -84,6 +84,13 @@ class Settings(BaseSettings):
     # Código secreto para que la primera persona que lo introduzca se convierta en administradora.
     # Solo funciona mientras no exista ningún administrador.
     admin_setup_code: str = ""
+    # Plataforma privada: los usuarios solo acceden con un periodo activo concedido por el administrador
+    require_access_grant: bool = True
+    # Contacto que ve quien no tiene acceso (WhatsApp, email...). Ej.: "WhatsApp +593 99 999 9999"
+    admin_contact: str = ""
+    access_reminder_days: int = 3
+    # Estadísticas en directo (córners, tiros, fueras de juego...): 1 llamada por partido en juego
+    live_stats_seconds: int = 180
 
     @property
     def cors_origins(self) -> list[str]:

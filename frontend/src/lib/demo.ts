@@ -169,6 +169,10 @@ export async function demoApi<T>(path: string, opts: { method?: string; body?: a
     if (!r) throw new DemoError(404, "Partido no encontrado");
     return r;
   }
+  if (p === "/bets/summary") return { overall: { bets: 0, settled: 0, won: 0, hit_rate: null, staked: 0, profit: 0, roi: null, avg_odds: null },
+    pending: 0, by_bookmaker: {}, by_market: {}, by_model: {}, by_timing: {}, cumulative: [] } as T;
+  if (p.startsWith("/bets")) { if (method === "GET") return [] as T; throw new DemoError(400, "En la demo no se pueden registrar apuestas: necesitan el servidor."); }
+  if (p === "/admin/income") return { months: {}, active_users: 0, expiring_in_3_days: 0 } as T;
   if (p === "/predictions/upcoming") return [] as T;
   if (p === "/predictions/top") return { threshold: 0.7, items: [],
     disclaimer: "Estimaciones estadísticas, no garantías. En la demo no hay partidos próximos." } as T;

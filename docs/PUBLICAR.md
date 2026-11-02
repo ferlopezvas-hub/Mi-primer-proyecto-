@@ -33,6 +33,7 @@ No hace falta usar la terminal.
    `sportai-redis` y `sportai-db`.
 4. Te pedirá los valores que no puede inventar. Rellena **solo**:
    - `API_FOOTBALL_KEY` → la clave del paso 1.
+   - `ADMIN_CONTACT` → cómo te contactan tus clientes para pagar, p. ej. `WhatsApp +593 99 999 9999`.
    - El resto puedes dejarlo **vacío** por ahora (se explican abajo).
 5. Pulsa **Apply**. Render construye todo (10-15 minutos la primera vez).
 
@@ -55,6 +56,26 @@ Cuando todo esté en verde (*Live*), abre el servicio **sportai-web** y copia su
 4. A partir de aquí el sistema trabaja solo, 24 horas al día:
    calendario cada 6 h, directo cada minuto cuando hay partidos, resultados, predicciones y avisos.
 
+## Uso personal y alquiler del acceso
+
+La plataforma es **privada**: cualquiera puede registrarse, pero no ve nada hasta que tú le das acceso.
+
+1. Tu cliente se registra y ve "Tu cuenta está pendiente de activación" con tu contacto.
+2. Te paga por transferencia o depósito a tu cuenta (fuera de la app).
+3. Tú entras en **Administración → Usuarios** → **Dar acceso** → eliges 30 días, anotas el monto y una nota
+   (banco, referencia) → **Activar 30 días**. El cliente pulsa "Ya pagué, comprobar" y entra.
+4. Tres días antes de vencer recibe un aviso. Para renovar: **Renovar** (los días se suman, no se pierden).
+   **Revocar** corta el acceso al momento.
+5. En **Administración → Métricas** verás cuántos accesos activos hay y lo cobrado cada mes.
+   Recuerda emitir tus comprobantes y declarar estos ingresos según la normativa de Ecuador (SRI).
+
+### Comprobar si apostar te da beneficio
+
+En la ficha de cada partido (antes o durante el juego) usa **Registrar mi apuesta** con la cuota y el importe que
+pusiste en tu casa de apuestas. Al terminar el partido se liquida sola. En **Mis apuestas** verás beneficio, ROI,
+porcentaje de aciertos, la evolución, y si te va mejor **siguiendo al modelo** o no.
+Con menos de unos cientos de apuestas el resultado depende mucho de la suerte.
+
 ## Paso 6 (recomendado). Activa las notificaciones push
 
 1. En Render: servicio **sportai-api** → **Shell** → escribe `python -m app.cli vapid-keys` y pulsa Enter.
@@ -76,6 +97,10 @@ correo (por ejemplo Brevo, Resend o Mailgun, que tienen planes gratuitos). Copia
 - Administración → Sistema: tareas en verde (`ok`).
 
 ## Qué ligas se siguen
+
+Durante cada partido en juego se actualizan marcador, minuto, goles, tarjetas, penaltis, VAR y cambios (cada minuto)
+y las estadísticas: córners, tiros, tiros a puerta, fueras de juego, faltas, posesión y xG (cada 3 minutos).
+No hay vídeo: eso requiere derechos de retransmisión.
 
 Por defecto: LaLiga (140), Premier League (39), Serie A (135), Bundesliga (78), Ligue 1 (61) y Champions League (2),
 temporada 2026/27. Para cambiarlas, edita `API_FOOTBALL_LEAGUES` en `sportai-secrets` (formato `id:temporada`,

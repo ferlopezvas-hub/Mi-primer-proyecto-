@@ -8,6 +8,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.access import has_access
 from app.config import get_settings
 from app.db import get_db
 from app.models import Role, UsageEvent, User
@@ -45,7 +46,21 @@ def get_current_user(
     user = _user_from_token(creds.credentials, db)
     enforce("user", str(user.id), get_settings().rate_limit_user_per_min)
     request.state.user_id = user.id
+    if not has_access(user) and not _allowed_without_access(request):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Tu acceso no está activo. Contacta con el administrador para activarlo.",
+                            headers={"X-Access": "inactive"})
     return user
+
+
+# Lo único que puede usar alguien sin periodo activo: ver su perfil, cerrar sesión y borrar su cuenta.
+_NO_ACCESS_ALLOWED = {("GET", "/api/v1/me"), ("PATCH", "/api/v1/me"), ("DELETE", "/api/v1/me"),
+                      ("GET", "/api/v1/me/plans"), ("POST", "/api/v1/auth/logout-all"),
+                      ("POST", "/api/v1/auth/change-password"), ("POST", "/api/v1/auth/claim-admin")}
+
+
+def _allowed_without_access(request: Request) -> bool:
+    return (request.method, request.url.path.rstrip("/")) in _NO_ACCESS_ALLOWED
 
 
 def get_optional_user(

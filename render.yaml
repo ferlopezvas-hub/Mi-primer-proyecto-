@@ -8,6 +8,9 @@ envVarGroups:
       - { key: ENVIRONMENT, value: production }
       - { key: JWT_SECRET, generateValue: true }
       - { key: ADMIN_SETUP_CODE, generateValue: true }   # cópialo del panel para hacerte administrador
+      - { key: REQUIRE_ACCESS_GRANT, value: "true" }     # plataforma privada: solo entra quien tenga acceso activo
+      - { key: ADMIN_CONTACT, sync: false }              # p. ej. "WhatsApp +593 99 999 9999" (lo ven los clientes)
+      - { key: LIVE_STATS_SECONDS, value: "180" }        # estadísticas en vivo cada 3 min por partido
       - { key: API_FOOTBALL_KEY, sync: false }
       - { key: API_FOOTBALL_DAILY_QUOTA, value: "7500" }
       - { key: API_FOOTBALL_LEAGUES, value: "140:2026,39:2026,135:2026,78:2026,61:2026,2:2026" }

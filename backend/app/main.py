@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from prometheus_client import Counter, Histogram
 
-from app.api import admin, auth, evaluation, health, me, notifications, predictions, sports
+from app.api import admin, auth, bets, evaluation, health, me, notifications, predictions, sports
 from app.config import get_settings
 from app.logging_config import setup_logging
 
@@ -33,6 +33,7 @@ def create_app() -> FastAPI:
         allow_credentials=False,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=["Authorization", "Content-Type"],
+        expose_headers=["X-Access", "X-Request-ID", "Retry-After"],
     )
 
     @app.middleware("http")
@@ -59,7 +60,7 @@ def create_app() -> FastAPI:
 
     app.include_router(health.router)
     for r in (auth.router, me.router, sports.router, predictions.router, evaluation.router,
-              notifications.router, admin.router):
+              notifications.router, admin.router, bets.router):
         app.include_router(r, prefix="/api/v1")
     return app
 

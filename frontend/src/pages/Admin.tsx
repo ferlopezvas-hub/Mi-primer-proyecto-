@@ -32,6 +32,7 @@ function Overview() {
         <Stat label="Avisos enviados (30 d)" value={d.notifications_period} hint={`${d.push_subscriptions} dispositivos push`} />
         <Stat label="Predicciones" value={d.predictions_live} hint={`${d.predictions_backtest} de backtest`} />
       </div>
+      <IncomeCard />
       <Card title="Usuarios activos por día (30 días)">
         {!days.length ? <p className="text-sm text-ink-2">Sin actividad registrada.</p> : (
           <div className="flex h-40 items-end gap-[2px]" role="img" aria-label="Usuarios activos diarios">
@@ -62,10 +63,11 @@ function Users() {
       {q.isLoading ? <Spinner /> : q.error ? <ErrorBox error={q.error} /> : (
         <div className="-mx-4 overflow-x-auto px-4">
           <table className="w-full min-w-[560px] text-left text-sm">
-            <thead className="text-xs text-muted"><tr><th className="pb-2">Email</th><th className="pb-2">Plan</th><th className="pb-2">Rol</th><th className="pb-2">Estado</th><th className="pb-2">Último acceso</th></tr></thead>
+            <thead className="text-xs text-muted"><tr><th className="pb-2">Email</th><th className="pb-2">Acceso hasta</th><th className="pb-2">Plan</th><th className="pb-2">Rol</th><th className="pb-2">Estado</th><th className="pb-2">Último acceso</th></tr></thead>
             <tbody>{q.data!.items.map((u) => (
-              <tr key={u.id} className="border-t border-line">
-                <td className="py-2 pr-2">{u.email}</td>
+              <tr key={u.id} className="border-t border-line align-top">
+                <td className="py-2 pr-2">{u.email}<div className="text-xs text-muted">{u.full_name}</div></td>
+                <td className="py-2 pr-2"><AccessCell u={u} /></td>
                 <td className="py-2 pr-2"><select className="rounded-lg border border-line bg-surface px-2 py-1" value={u.plan.code} onChange={(e) => patch.mutate({ id: u.id, body: { plan_code: e.target.value } })}>
                   {["free", "pro", "elite"].map((p) => <option key={p}>{p}</option>)}</select></td>
                 <td className="py-2 pr-2"><select className="rounded-lg border border-line bg-surface px-2 py-1" value={u.role} onChange={(e) => patch.mutate({ id: u.id, body: { role: e.target.value } })}>
@@ -132,5 +134,70 @@ function System() {
         )}
       </Card>
     </div>
+  );
+}
+
+function AccessCell({ u }: { u: any }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [f, setF] = useState({ days: "30", amount: "", note: "" });
+  const done = () => { qc.invalidateQueries({ queryKey: ["admin"] }); setOpen(false); };
+  const grant = useMutation({ mutationFn: () => api(`/admin/users/${u.id}/access`, { method: "POST",
+    body: { days: Number(f.days), amount: f.amount ? Number(f.amount.replace(",", ".")) : null, currency: "USD", note: f.note } }), onSuccess: done });
+  const revoke = useMutation({ mutationFn: () => api(`/admin/users/${u.id}/access/revoke`, { method: "POST" }), onSuccess: done });
+  const grants = useQuery({ queryKey: ["admin", "grants", u.id], enabled: open, queryFn: () => api<any[]>(`/admin/users/${u.id}/grants`) });
+  if (u.role === "admin") return <span className="text-xs text-muted">Siempre (admin)</span>;
+  const active = u.access_active;
+  return (
+    <div className="min-w-[180px] space-y-1">
+      {u.access_expires_at ? (
+        active ? <StatusBadge kind="good">{new Date(u.access_expires_at).toLocaleDateString("es-EC")}</StatusBadge>
+          : <StatusBadge kind="bad">Vencido {new Date(u.access_expires_at).toLocaleDateString("es-EC")}</StatusBadge>
+      ) : <StatusBadge kind="warn">Sin activar</StatusBadge>}
+      <div className="flex gap-1">
+        <button className="text-xs text-brand" onClick={() => setOpen(!open)}>{open ? "Cerrar" : active ? "Renovar" : "Dar acceso"}</button>
+        {active && <button className="text-xs text-bad" onClick={() => revoke.mutate()}>· Revocar</button>}
+      </div>
+      {open && (
+        <form className="space-y-2 rounded-xl border border-line p-2" onSubmit={(e) => { e.preventDefault(); grant.mutate(); }}>
+          <div className="flex gap-1">
+            <select aria-label="Días" className="rounded-lg border border-line bg-surface px-2 py-1" value={f.days} onChange={(e) => setF({ ...f, days: e.target.value })}>
+              {["7", "15", "30", "60", "90"].map((d) => <option key={d} value={d}>{d} días</option>)}
+            </select>
+            <input aria-label="Monto recibido (USD)" placeholder="Monto USD" inputMode="decimal" className="w-24 rounded-lg border border-line bg-surface px-2 py-1" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} />
+          </div>
+          <input aria-label="Nota del pago" placeholder="Nota (banco, referencia…)" className="w-full rounded-lg border border-line bg-surface px-2 py-1" value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} />
+          <button className="btn-primary min-h-[36px] w-full py-1" disabled={grant.isPending}>{active ? `Sumar ${f.days} días` : `Activar ${f.days} días`}</button>
+          {(grant.error || revoke.error) && <ErrorBox error={grant.error ?? revoke.error} />}
+          {!!grants.data?.length && (
+            <ul className="space-y-0.5 text-xs text-ink-2">{grants.data.map((g) => (
+              <li key={g.id}>{new Date(g.created_at).toLocaleDateString("es-EC")}: +{g.days} d{g.amount ? ` · ${g.amount} ${g.currency}` : ""}{g.note ? ` · ${g.note}` : ""}{g.revoked ? " (revocado)" : ""}</li>
+            ))}</ul>
+          )}
+        </form>
+      )}
+    </div>
+  );
+}
+
+function IncomeCard() {
+  const q = useQuery({ queryKey: ["admin", "income"], queryFn: () => api<{ months: Record<string, { grants: number; total: Record<string, number> }>; active_users: number; expiring_in_3_days: number }>("/admin/income") });
+  if (!q.data) return null;
+  const months = Object.entries(q.data.months).reverse();
+  return (
+    <Card title="Alquiler: accesos y cobros">
+      <div className="mb-3 flex flex-wrap gap-2">
+        <Badge tone="brand">{q.data.active_users} usuarios con acceso activo</Badge>
+        {q.data.expiring_in_3_days > 0 && <StatusBadge kind="warn">{q.data.expiring_in_3_days} vencen en 3 días</StatusBadge>}
+      </div>
+      {!months.length ? <p className="text-sm text-ink-2">Aún no has activado ningún acceso. Hazlo desde la pestaña Usuarios.</p> : (
+        <table className="w-full text-left text-sm"><thead className="text-xs text-muted"><tr><th className="pb-2">Mes</th><th className="pb-2">Activaciones</th><th className="pb-2">Cobrado</th></tr></thead>
+          <tbody>{months.map(([m, v]) => (
+            <tr key={m} className="border-t border-line"><td className="py-1.5">{m}</td><td className="tabular-nums">{v.grants}</td>
+              <td className="tabular-nums">{Object.entries(v.total).map(([c, t]) => `${t.toFixed(2)} ${c}`).join(" · ") || "—"}</td></tr>
+          ))}</tbody></table>
+      )}
+      <p className="mt-2 text-xs text-muted">Los importes los anotas tú al activar cada acceso. Guarda también tus comprobantes y facturas.</p>
+    </Card>
   );
 }

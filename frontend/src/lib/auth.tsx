@@ -26,8 +26,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     reload();
     const out = () => setUser(null);
+    const recheck = () => { reload(); };
     window.addEventListener("sportai:logout", out);
-    return () => window.removeEventListener("sportai:logout", out);
+    window.addEventListener("sportai:access", recheck);
+    return () => { window.removeEventListener("sportai:logout", out); window.removeEventListener("sportai:access", recheck); };
   }, [reload]);
   const login = async (email: string, password: string) => {
     const t = await api("/auth/login", { method: "POST", body: { email, password }, auth: false });

@@ -290,3 +290,20 @@ def test_bootstrap_loads_history_and_dedupes_sources(db, monkeypatch):
                                     status=MatchStatus.finished, detail="FT", hs=0, as_=1)], notify=False)
     hist = load_history(db, Sport.football, "la liga", datetime(2027, 1, 1, tzinfo=UTC))
     assert len(hist) == 9
+
+
+def test_live_stats_job(db):
+    class StatsProvider(FakeProvider):
+        def statistics(self, pid, home_pid):
+            self.calls.append(f"stats:{pid}:{home_pid}")
+            return {"home": {"corners": 5}, "away": {"corners": 1}}
+
+    p = StatsProvider()
+    set_providers([p])
+    process(db, "fake", [dto(start=_now(), status=MatchStatus.live, detail="1H", hs=0, as_=0)])
+    process(db, "fake", [dto(pid="m2", start=_now() + timedelta(hours=4), home="X", away="Y")])
+    out = jobs.run_live_stats(db)
+    assert out["fake"] == 1 and p.calls == ["stats:m1:Equipo A-id"]
+    db.expire_all()
+    m = db.scalar(select(Match).where(Match.provider_id == "m1"))
+    assert m.stats["live"]["home"]["corners"] == 5

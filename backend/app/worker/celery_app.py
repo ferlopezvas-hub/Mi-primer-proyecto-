@@ -27,6 +27,7 @@ celery.conf.update(
     task_default_queue="default",
     task_routes={
         "app.worker.tasks.sync_live": {"queue": "live"},
+        "app.worker.tasks.sync_live_stats": {"queue": "live"},
         "app.worker.tasks.fanout_events": {"queue": "notifications"},
         "app.worker.tasks.send_push": {"queue": "notifications"},
         "app.worker.tasks.check_upcoming": {"queue": "notifications"},
@@ -43,6 +44,9 @@ celery.conf.update(
                                  "schedule": float(s.predictions_seconds)},
         "resolve-predictions": {"task": "app.worker.tasks.resolve_predictions", "schedule": 900.0},
         "watchdog": {"task": "app.worker.tasks.watchdog", "schedule": 300.0},
+        "sync-live-stats": {"task": "app.worker.tasks.sync_live_stats", "schedule": float(s.live_stats_seconds),
+                            "options": {"expires": s.live_stats_seconds}},
+        "access-reminders": {"task": "app.worker.tasks.access_reminders", "schedule": 6 * 3600.0},
         "cleanup": {"task": "app.worker.tasks.cleanup", "schedule": 86400.0},
     },
 )

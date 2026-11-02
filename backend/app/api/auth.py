@@ -9,6 +9,7 @@ from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
+from app.access import has_access
 from app.config import get_settings
 from app.db import get_db
 from app.deps import get_current_user
@@ -86,6 +87,9 @@ def user_out(user: User) -> dict:
         "plan": get_plan(user.plan_code).to_dict(),
         "timezone": user.timezone,
         "created_at": user.created_at,
+        "access_expires_at": user.access_expires_at,
+        "access_active": has_access(user),
+        "admin_contact": get_settings().admin_contact,
     }
 
 

@@ -50,6 +50,7 @@ export async function api<T = any>(path: string, opts: { method?: string; body?:
   try { res = await doFetch(); } catch { throw new ApiError(0, "Sin conexión con el servidor. Reintentando…"); }
   if (res.status === 401 && opts.auth !== false && (await tryRefresh())) res = await doFetch();
   if (res.status === 401 && opts.auth !== false) { tokens.clear(); window.dispatchEvent(new Event("sportai:logout")); }
+  if (res.status === 403 && res.headers.get("X-Access") === "inactive") window.dispatchEvent(new Event("sportai:access"));
   if (!res.ok) {
     let msg = `Error ${res.status}`;
     try { const d = await res.json(); msg = typeof d.detail === "string" ? d.detail : Array.isArray(d.detail) ? d.detail.map((x: any) => x.msg).join(". ") : msg; } catch { /* sin cuerpo */ }

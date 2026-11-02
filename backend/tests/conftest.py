@@ -5,6 +5,7 @@ os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite:///:memory:")
 os.environ.setdefault("REDIS_URL", "memory://")
 os.environ.setdefault("JWT_SECRET", "test-secret-test-secret-test-secret-123")
 os.environ.setdefault("RATE_LIMIT_AUTH_PER_MIN", "1000")
+os.environ.setdefault("REQUIRE_ACCESS_GRANT", "false")  # las pruebas de acceso lo activan explícitamente
 for k in ("API_FOOTBALL_KEY", "API_BASKETBALL_KEY", "API_TENNIS_KEY", "FOOTBALL_DATA_ORG_KEY"):
     os.environ[k] = ""
 

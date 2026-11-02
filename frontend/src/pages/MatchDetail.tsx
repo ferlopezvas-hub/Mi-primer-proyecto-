@@ -3,6 +3,8 @@ import { ArrowLeft, Clock } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { FollowButton } from "../components/FollowButton";
 import { MatchCard as MatchCardLite } from "../components/MatchCard";
+import { BetForm } from "../components/BetForm";
+import { LiveStats } from "../components/LiveStats";
 import { PredictionCard } from "../components/PredictionCard";
 import { Card, Empty, ErrorBox, LiveDot, Spinner } from "../components/ui";
 import { api } from "../lib/api";
@@ -57,6 +59,13 @@ export function MatchDetail() {
 
       <div className="grid gap-5 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
+          <Card title={m.status === "live" ? "Estadísticas en directo" : "Estadísticas"}><LiveStats m={m} events={events} /></Card>
+          {(m.status === "scheduled" || m.status === "live") && (
+            <Card title="Registrar mi apuesta">
+              <p className="mb-3 text-sm text-ink-2">Anota la apuesta que hiciste en tu casa de apuestas para medir tu beneficio real. <Link to="/bets" className="text-brand">Ver mis apuestas</Link></p>
+              <BetForm match={m} />
+            </Card>
+          )}
           <h2 className="text-lg font-semibold">Análisis y predicción</h2>
           {preds.isLoading ? <Spinner /> : preds.error ? <ErrorBox error={preds.error} /> : !preds.data?.predictions.length ? (
             <Card><Empty title="Sin predicción para este partido" text={preds.data?.note} /></Card>

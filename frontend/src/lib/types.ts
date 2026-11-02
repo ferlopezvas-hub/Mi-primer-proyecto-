@@ -20,7 +20,14 @@ export interface Prediction {
 }
 export interface Plan { code: string; name: string; description: string; prediction_views_per_day: number | null; max_follows: number;
   full_explanations: boolean; push_notifications: boolean; history_days: number | null; features: string[] }
-export interface User { id: number; email: string; full_name: string; role: "user" | "admin"; plan: Plan; timezone: string; created_at: string }
+export interface User { id: number; email: string; full_name: string; role: "user" | "admin"; plan: Plan; timezone: string; created_at: string;
+  access_expires_at?: string | null; access_active?: boolean; admin_contact?: string }
+export interface BetAgg { bets: number; settled: number; won: number; hit_rate: number | null; staked: number; profit: number; roi: number | null; avg_odds: number | null }
+export interface Bet { id: number; match: Match | null; description: string; market: string; selection: string; odds: number; stake: number;
+  bookmaker: string; note: string; placed_at: string; in_play: boolean; model_pick: string | null; model_probability: number | null;
+  status: "pending" | "won" | "lost" | "void"; profit: number | null; settled_at: string | null; expected_value: number | null }
+export interface BetSummary { overall: BetAgg; pending: number; by_bookmaker: Record<string, BetAgg>; by_market: Record<string, BetAgg>;
+  by_model: Record<string, BetAgg>; by_timing: Record<string, BetAgg>; cumulative: { date: string; profit: number }[] }
 export interface Notification { id: number; kind: string; title: string; body: string; data: Record<string, any>; match_id: number | null; created_at: string; read_at: string | null }
 export interface Block { n: number; hits?: number; accuracy: number | null; accuracy_ci95: [number, number] | null; brier: number | null;
   brier_uniform_baseline?: number; log_loss: number | null; avg_confidence?: number; conclusive: boolean }

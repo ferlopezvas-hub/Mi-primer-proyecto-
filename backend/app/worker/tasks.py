@@ -135,12 +135,27 @@ def generate_predictions():
 
 @celery.task(name="app.worker.tasks.resolve_predictions")
 def resolve_predictions():
-    return tracked("resolve_predictions", 900)(lambda db: {"resolved": resolve_pending(db)})()
+    from app.bets import settle_pending
+
+    return tracked("resolve_predictions", 900)(
+        lambda db: {"resolved": resolve_pending(db), "bets_settled": settle_pending(db)})()
 
 
 @celery.task(name="app.worker.tasks.bootstrap_history", time_limit=3 * 3600, soft_time_limit=3 * 3600 - 60)
 def bootstrap_history():
     return tracked("bootstrap_history", 3 * 3600)(jobs.run_bootstrap)()
+
+
+@celery.task(name="app.worker.tasks.sync_live_stats")
+def sync_live_stats():
+    return tracked("sync_live_stats", 300)(jobs.run_live_stats)()
+
+
+@celery.task(name="app.worker.tasks.access_reminders")
+def access_reminders():
+    from app.access import send_expiry_reminders
+
+    return tracked("access_reminders", 600)(lambda db: {"reminders": send_expiry_reminders(db)})()
 
 
 @celery.task(name="app.worker.tasks.cleanup")

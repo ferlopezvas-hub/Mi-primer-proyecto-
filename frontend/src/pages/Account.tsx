@@ -67,6 +67,9 @@ export function ProfilePage() {
   return (
     <div className="space-y-5">
       <PageHeader title="Perfil" subtitle={user.email} />
+      {user.role !== "admin" && user.access_expires_at && (
+        <p className="text-sm">Tu acceso está activo hasta el <b>{new Date(user.access_expires_at).toLocaleDateString("es-EC", { day: "numeric", month: "long", year: "numeric" })}</b>.{user.admin_contact ? ` Para renovar: ${user.admin_contact}` : ""}</p>
+      )}
       {msg && <StatusBadge kind="good">{msg}</StatusBadge>}
       <div className="grid gap-5 lg:grid-cols-2">
         <Card title="Datos personales">

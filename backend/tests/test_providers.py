@@ -188,3 +188,17 @@ def test_parse_fixtures_only_future():
     # mismo identificador que tendrá el resultado al importarse después
     res = parse_csv("Div,Date,Time,HomeTeam,AwayTeam,FTHG,FTAG\nSP1,08/11/2026,18:30,Betis,Celta,1,0\n", "SP1", "2026")
     assert res[0].provider_id == out[0].provider_id
+
+
+def test_parse_football_statistics():
+    from app.providers.api_sports import parse_football_statistics
+
+    items = [{"team": {"id": 1}, "statistics": [{"type": "Corner Kicks", "value": 6}, {"type": "Offsides", "value": 2},
+                                                {"type": "Ball Possession", "value": "58%"},
+                                                {"type": "Yellow Cards", "value": None},
+                                                {"type": "expected_goals", "value": "1.43"}]},
+             {"team": {"id": 2}, "statistics": [{"type": "Corner Kicks", "value": 3},
+                                                {"type": "Shots on Goal", "value": 4}]}]
+    s = parse_football_statistics(items, "1")
+    assert s["home"] == {"corners": 6, "offsides": 2, "possession": 58, "yellow_cards": 0, "xg": 1.43}
+    assert s["away"] == {"corners": 3, "shots_on_target": 4}

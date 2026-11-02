@@ -3,7 +3,9 @@ import { Layout } from "./components/Layout";
 import { Spinner } from "./components/ui";
 import { useAuth } from "./lib/auth";
 import { NotificationsPage, ProfilePage, SettingsPage } from "./pages/Account";
+import { AccessPending } from "./pages/AccessPending";
 import { AdminPage } from "./pages/Admin";
+import { BetsPage } from "./pages/Bets";
 import { ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage } from "./pages/AuthPages";
 import { CalendarPage, LivePage, SearchPage } from "./pages/Browse";
 import { Dashboard } from "./pages/Dashboard";
@@ -16,6 +18,7 @@ function Protected({ admin = false, children }: { admin?: boolean; children: JSX
   if (loading) return <Spinner />;
   if (!user) return <Navigate to="/login" state={{ from: loc.pathname }} replace />;
   if (admin && user.role !== "admin") return <Navigate to="/" replace />;
+  if (user.access_active === false) return <AccessPending />;
   return children;
 }
 
@@ -41,6 +44,7 @@ export default function App() {
         <Route path="matches/:id" element={<MatchDetail />} />
         <Route path="teams/:id" element={<TeamPage />} />
         <Route path="notifications" element={<NotificationsPage />} />
+        <Route path="bets" element={<BetsPage />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="admin" element={<Protected admin><AdminPage /></Protected>} />

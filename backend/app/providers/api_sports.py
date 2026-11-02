@@ -146,6 +146,45 @@ class ApiFootballProvider(SportsProvider):
         return [parse_football_fixture(i) for i in self._get("/fixtures", {"league": competition_id,
                                                                             "season": season})]
 
+    def statistics(self, provider_id: str, home_provider_id: str) -> dict:
+        """Córners, tiros, fueras de juego, faltas, posesión, tarjetas... (1 llamada por partido)."""
+        return parse_football_statistics(self._get("/fixtures/statistics", {"fixture": provider_id}),
+                                         home_provider_id)
+
+
+STAT_KEYS = {
+    "shots on goal": "shots_on_target", "shots off goal": "shots_off_target", "total shots": "shots",
+    "blocked shots": "shots_blocked", "shots insidebox": "shots_inside_box", "shots outsidebox": "shots_outside_box",
+    "fouls": "fouls", "corner kicks": "corners", "offsides": "offsides", "ball possession": "possession",
+    "yellow cards": "yellow_cards", "red cards": "red_cards", "goalkeeper saves": "saves",
+    "total passes": "passes", "passes accurate": "passes_accurate", "passes %": "pass_accuracy",
+    "expected_goals": "xg",
+}
+
+
+def _num(v):
+    if v is None:
+        return 0
+    if isinstance(v, int | float):
+        return v
+    s = str(v).strip().rstrip("%")
+    try:
+        return float(s) if "." in s else int(s)
+    except ValueError:
+        return None
+
+
+def parse_football_statistics(items: list[dict], home_id: str) -> dict:
+    """Respuesta de /fixtures/statistics -> {"home": {...}, "away": {...}} con claves normalizadas."""
+    out: dict = {"home": {}, "away": {}}
+    for block in items:
+        side = "home" if str((block.get("team") or {}).get("id")) == str(home_id) else "away"
+        for st in block.get("statistics") or []:
+            key = STAT_KEYS.get((st.get("type") or "").strip().lower())
+            if key:
+                out[side][key] = _num(st.get("value"))
+    return out
+
 
 # ------------------------------------------------------------------ baloncesto
 def _quarters(scores: dict) -> dict:

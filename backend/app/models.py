@@ -71,6 +71,8 @@ class User(Base):
     token_version: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Acceso por tiempo limitado (alquiler): hasta esta fecha el usuario puede usar la plataforma
+    access_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     follows: Mapped[list[Follow]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
@@ -322,3 +324,61 @@ class JobRun(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="running")  # running|ok|error|skipped
     detail: Mapped[dict] = mapped_column(JSONType, default=dict)
+
+
+# ---------------------------------------------------------------- Alquiler de acceso
+class AccessGrant(Base):
+    """Cada activación o renovación de acceso que hace el administrador (con el pago recibido)."""
+
+    __tablename__ = "access_grants"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    granted_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    days: Mapped[int] = mapped_column(Integer)
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    amount: Mapped[float | None] = mapped_column(Float, nullable=True)
+    currency: Mapped[str] = mapped_column(String(8), default="USD")
+    note: Mapped[str] = mapped_column(String(300), default="")
+    revoked: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
+# ---------------------------------------------------------------- Diario de apuestas
+class BetStatus(str, enum.Enum):
+    pending = "pending"
+    won = "won"
+    lost = "lost"
+    void = "void"
+
+
+class Bet(Base):
+    """Apuesta registrada por el usuario en su casa de apuestas (la plataforma no acepta apuestas)."""
+
+    __tablename__ = "bets"
+    __table_args__ = (
+        Index("ix_bets_user_placed", "user_id", "placed_at"),
+        CheckConstraint("odds > 1", name="ck_bet_odds"),
+        CheckConstraint("stake >= 0", name="ck_bet_stake"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    match_id: Mapped[int | None] = mapped_column(ForeignKey("matches.id", ondelete="SET NULL"), nullable=True)
+    description: Mapped[str] = mapped_column(String(200), default="")
+    market: Mapped[str] = mapped_column(String(40))  # 1x2 | over_under_2.5 | btts | moneyline | match_winner | other
+    selection: Mapped[str] = mapped_column(String(40))
+    odds: Mapped[float] = mapped_column(Float)
+    stake: Mapped[float] = mapped_column(Float)
+    bookmaker: Mapped[str] = mapped_column(String(60), default="")
+    note: Mapped[str] = mapped_column(String(300), default="")
+    placed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    in_play: Mapped[bool] = mapped_column(Boolean, default=False)
+    model_pick: Mapped[str | None] = mapped_column(String(20), nullable=True)  # pronóstico del modelo al apostar
+    model_probability: Mapped[float | None] = mapped_column(Float, nullable=True)
+    status: Mapped[BetStatus] = mapped_column(_enum(BetStatus), default=BetStatus.pending)
+    profit: Mapped[float | None] = mapped_column(Float, nullable=True)
+    settled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    match: Mapped[Match | None] = relationship()

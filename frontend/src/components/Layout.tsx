@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
-import { Bell, CalendarDays, Gauge, LayoutDashboard, LogOut, Menu, Radio, Search, Settings, Shield, User, X } from "lucide-react";
+import { Bell, CalendarDays, Gauge, Wallet, LayoutDashboard, LogOut, Menu, Radio, Search, Settings, Shield, User, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { api, DEMO } from "../lib/api";
@@ -13,11 +13,12 @@ const NAV = [
   { to: "/calendar", label: "Calendario", icon: CalendarDays },
   { to: "/live", label: "En directo", icon: Radio },
   { to: "/predictions", label: "Predicciones", icon: Gauge },
+  { to: "/bets", label: "Mis apuestas", icon: Wallet },
   { to: "/notifications", label: "Notificaciones", icon: Bell },
   { to: "/profile", label: "Perfil", icon: User },
   { to: "/settings", label: "Configuración", icon: Settings },
 ];
-const MOBILE = ["/", "/live", "/calendar", "/predictions", "/notifications"];
+const MOBILE = ["/", "/live", "/bets", "/predictions", "/notifications"];
 
 export function Layout() {
   const { user, logout } = useAuth();
@@ -41,7 +42,7 @@ export function Layout() {
           <span className="absolute -right-2 -top-1.5 min-w-[16px] rounded-full bg-live px-1 text-center text-[10px] font-semibold leading-4 text-white">{unread > 99 ? "99+" : unread}</span>
         )}
       </span>
-      <span className={compact ? "" : "truncate"}>{compact ? ({ "En directo": "Directo", Notificaciones: "Avisos" } as Record<string, string>)[n.label] ?? n.label : n.label}</span>
+      <span className={compact ? "" : "truncate"}>{compact ? ({ "En directo": "Directo", Notificaciones: "Avisos", "Mis apuestas": "Apuestas" } as Record<string, string>)[n.label] ?? n.label : n.label}</span>
     </NavLink>
   );
 

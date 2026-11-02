@@ -3,15 +3,17 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app import access
 from app.api.auth import user_out
 from app.config import get_settings
 from app.db import get_db
 from app.deps import require_admin
 from app.models import (
+    AccessGrant,
     AuditLog,
     JobRun,
     Match,
@@ -33,6 +35,13 @@ ALLOWED_TASKS = {"sync_fixtures", "sync_live", "sync_results", "generate_predict
                  "fanout_events", "check_upcoming", "bootstrap_history"}
 
 
+class AccessIn(BaseModel):
+    days: int = Field(30, ge=1, le=366)
+    amount: float | None = Field(default=None, ge=0, le=1_000_000)
+    currency: str = Field(default="USD", max_length=8)
+    note: str = Field(default="", max_length=300)
+
+
 class UserPatch(BaseModel):
     role: Role | None = None
     plan_code: str | None = None
@@ -49,6 +58,62 @@ def users(q: str | None = None, limit: int = Query(50, le=200), offset: int = 0,
     rows = db.scalars(stmt.order_by(User.id.desc()).limit(limit).offset(offset)).all()
     return {"total": total, "items": [{**user_out(u), "is_active": u.is_active, "last_login_at": u.last_login_at}
                                       for u in rows]}
+
+
+@router.post("/users/{user_id}/access")
+def grant_access(user_id: int, body: AccessIn, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    """Concede o renueva el acceso (p. ej. 30 días tras recibir el pago) y lo deja registrado."""
+    u = db.get(User, user_id)
+    if not u:
+        raise HTTPException(404, "No encontrado")
+    g = access.grant(db, u, body.days, admin, body.amount, body.currency.upper(), body.note.strip())
+    db.add(AuditLog(actor_id=admin.id, action="access.grant",
+                    detail={"user_id": u.id, "days": body.days, "amount": body.amount, "until": g.ends_at.isoformat()}))
+    db.add(UserNotification(user_id=u.id, kind="access_granted", title="✅ Acceso activado",
+                            body=f"Tu acceso está activo hasta el {g.ends_at.strftime('%d/%m/%Y')}.",
+                            data={"url": "/"}, dedup_key=f"access_granted:{g.ends_at.isoformat()}"))
+    db.commit()
+    return {**user_out(u), "is_active": u.is_active, "last_login_at": u.last_login_at}
+
+
+@router.post("/users/{user_id}/access/revoke")
+def revoke_access(user_id: int, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    u = db.get(User, user_id)
+    if not u:
+        raise HTTPException(404, "No encontrado")
+    if u.id == admin.id:
+        raise HTTPException(400, "No puedes revocarte el acceso a ti mismo")
+    access.revoke(db, u)
+    db.add(AuditLog(actor_id=admin.id, action="access.revoke", detail={"user_id": u.id}))
+    db.commit()
+    return {**user_out(u), "is_active": u.is_active, "last_login_at": u.last_login_at}
+
+
+@router.get("/users/{user_id}/grants")
+def user_grants(user_id: int, _: User = Depends(require_admin), db: Session = Depends(get_db)):
+    rows = db.scalars(select(AccessGrant).where(AccessGrant.user_id == user_id).order_by(AccessGrant.id.desc())).all()
+    return [{"id": g.id, "days": g.days, "starts_at": g.starts_at, "ends_at": g.ends_at, "amount": g.amount,
+             "currency": g.currency, "note": g.note, "revoked": g.revoked, "created_at": g.created_at} for g in rows]
+
+
+@router.get("/income")
+def income(_: User = Depends(require_admin), db: Session = Depends(get_db)):
+    """Resumen de cobros registrados al conceder accesos (lo anota el administrador)."""
+    rows = db.scalars(select(AccessGrant).order_by(AccessGrant.created_at)).all()
+    months: dict[str, dict] = {}
+    for g in rows:
+        key = g.created_at.strftime("%Y-%m")
+        m = months.setdefault(key, {"grants": 0, "total": {}})
+        m["grants"] += 1
+        if g.amount:
+            m["total"][g.currency] = round(m["total"].get(g.currency, 0) + g.amount, 2)
+    now = datetime.now(UTC)
+    active = db.scalar(select(func.count()).select_from(User).where(User.access_expires_at > now,
+                                                                    User.role != Role.admin))
+    soon = db.scalar(select(func.count()).select_from(User).where(User.access_expires_at > now,
+                                                                  User.access_expires_at <= now + timedelta(days=3),
+                                                                  User.role != Role.admin))
+    return {"months": months, "active_users": active, "expiring_in_3_days": soon}
 
 
 @router.patch("/users/{user_id}")
