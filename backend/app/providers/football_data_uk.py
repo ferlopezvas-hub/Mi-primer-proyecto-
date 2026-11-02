@@ -37,15 +37,44 @@ def _date(d: str, t: str) -> datetime:
     return dt.replace(tzinfo=UTC)  # hora aproximada (el CSV usa hora del Reino Unido)
 
 
+BOM = "\ufeff"
+
+
+def _pid(div: str, start: datetime, home: str, away: str) -> str:
+    return hashlib.sha256(f"{div}|{start.date()}|{home}|{away}".encode()).hexdigest()[:24]
+
+
+def parse_fixtures(text: str, season: str, now: datetime | None = None) -> list[MatchDTO]:
+    """fixtures.csv: próximos partidos (todas las divisiones). Solo se importan los futuros."""
+    now = now or datetime.now(UTC)
+    out = []
+    for row in csv.DictReader(io.StringIO(text.lstrip(BOM))):
+        div = (row.get("Div") or "").strip()
+        if div not in DIVISIONS or not row.get("HomeTeam"):
+            continue
+        name, country = DIVISIONS[div]
+        home, away = row["HomeTeam"].strip(), row["AwayTeam"].strip()
+        start = _date(row["Date"], row.get("Time") or "")
+        if start <= now:
+            continue
+        out.append(MatchDTO(
+            provider_id=_pid(div, start, home, away), sport=Sport.football,
+            home=TeamDTO(canonical(home), home, country), away=TeamDTO(canonical(away), away, country),
+            start_time=start, status=MatchStatus.scheduled, status_detail="NS",
+            competition=CompetitionDTO(div, name, season, country),
+        ))
+    return out
+
+
 def parse_csv(text: str, div: str, season: str) -> list[MatchDTO]:
     name, country = DIVISIONS.get(div, (div, ""))
     out = []
-    for row in csv.DictReader(io.StringIO(text.lstrip("﻿"))):
+    for row in csv.DictReader(io.StringIO(text.lstrip(BOM))):
         if not row.get("HomeTeam") or row.get("FTHG") in (None, ""):
             continue
         home, away = row["HomeTeam"].strip(), row["AwayTeam"].strip()
         start = _date(row["Date"], row.get("Time") or "")
-        pid = hashlib.sha256(f"{div}|{start.date()}|{home}|{away}".encode()).hexdigest()[:24]
+        pid = _pid(div, start, home, away)
         hg, ag = int(row["FTHG"]), int(row["FTAG"])
         periods = {"fulltime": {"home": hg, "away": ag}}
         if row.get("HTHG") not in (None, ""):
@@ -62,6 +91,13 @@ def parse_csv(text: str, div: str, season: str) -> list[MatchDTO]:
             periods=periods, competition=CompetitionDTO(div, name, season, country), stats=stats,
         ))
     return out
+
+
+def download_fixtures(client: httpx.Client | None = None) -> str:
+    c = client or httpx.Client(timeout=30, follow_redirects=True)
+    r = c.get("https://www.football-data.co.uk/fixtures.csv")
+    r.raise_for_status()
+    return r.content.decode("utf-8", errors="replace")
 
 
 def download(div: str, season_code: str, client: httpx.Client | None = None) -> str:

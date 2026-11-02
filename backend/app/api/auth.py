@@ -39,7 +39,7 @@ class RegisterIn(BaseModel):
 
 
 class LoginIn(BaseModel):
-    email: EmailStr
+    email: str = Field(max_length=320)  # sin validar formato: solo se compara con cuentas existentes
     password: str = Field(max_length=256)
 
 
@@ -55,7 +55,7 @@ class RefreshIn(BaseModel):
 
 
 class ForgotIn(BaseModel):
-    email: EmailStr
+    email: str = Field(max_length=320)
 
 
 class ResetIn(BaseModel):
@@ -127,7 +127,7 @@ def register(body: RegisterIn, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=TokenOut, dependencies=[Depends(auth_rate_limit)])
 def login(body: LoginIn, db: Session = Depends(get_db)):
-    user = db.scalar(select(User).where(User.email == body.email.lower()))
+    user = db.scalar(select(User).where(User.email == body.email.strip().lower()))
     if not user:
         verify_password(body.password, _DUMMY_HASH)
         raise HTTPException(401, "Email o contraseña incorrectos")

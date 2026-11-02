@@ -62,4 +62,7 @@ def walk_forward(db: Session, sport: Sport, start: datetime, end: datetime, comp
                                                      Prediction.match_id.in_([m.id for m in ms]))).all():
             resolve_prediction(p, p.match)
         db.commit()
+    from app.evaluation.service import invalidate_cache
+
+    invalidate_cache()
     return stats

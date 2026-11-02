@@ -4,18 +4,20 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore",
+                                      populate_by_name=True)
 
     # --- General ---
     environment: Literal["development", "test", "production"] = "development"
     app_name: str = "SPORT AI PREDICTOR"
     public_web_url: str = "http://localhost:5173"
-    cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
+    # Orígenes permitidos separados por comas (p. ej. "https://app.midominio.com,https://midominio.com")
+    cors_origins_raw: str = Field(default="http://localhost:5173", alias="CORS_ORIGINS")
     log_level: str = "INFO"
 
     # --- Infraestructura ---
@@ -33,7 +35,7 @@ class Settings(BaseSettings):
     # Límites de peticiones de la API pública (por minuto)
     rate_limit_anonymous_per_min: int = 60
     rate_limit_auth_per_min: int = 10
-    rate_limit_user_per_min: int = 120
+    rate_limit_user_per_min: int = 300
 
     # --- Proveedores de datos (vacío = desactivado) ---
     api_football_key: str = ""
@@ -75,12 +77,9 @@ class Settings(BaseSettings):
     # --- Modelos ---
     accuracy_target: float = 0.70  # objetivo experimental, nunca se fuerza
 
-    @field_validator("cors_origins", mode="before")
-    @classmethod
-    def _split_origins(cls, v):
-        if isinstance(v, str):
-            return [o.strip() for o in v.split(",") if o.strip()]
-        return v
+    @property
+    def cors_origins(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins_raw.split(",") if o.strip()]
 
     @model_validator(mode="after")
     def _check_production(self):

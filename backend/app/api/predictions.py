@@ -45,6 +45,12 @@ def for_match(match_id: int, user: User = Depends(get_current_user), db: Session
         raise HTTPException(404, "Partido no encontrado")
     preds = db.scalars(select(Prediction).where(Prediction.match_id == match_id, Prediction.is_backtest.is_(False))
                        .order_by(Prediction.market)).all()
+    mode = "live"
+    if not preds:
+        # Sin predicción publicada: se muestra la de la prueba histórica, claramente etiquetada.
+        preds = db.scalars(select(Prediction).where(Prediction.match_id == match_id, Prediction.is_backtest.is_(True))
+                           .order_by(Prediction.market)).all()
+        mode = "backtest"
     if not preds:
         note = (m.stats or {}).get("prediction_note")
         return {"match": match_out(m), "predictions": [],
@@ -52,7 +58,8 @@ def for_match(match_id: int, user: User = Depends(get_current_user), db: Session
                                 "suficientes."}
     consume_prediction_view(db, user, f"match:{match_id}")
     full = get_plan(user.plan_code).full_explanations
-    return {"match": match_out(m), "predictions": [prediction_out(p, full) for p in preds], "limited": not full}
+    return {"match": match_out(m), "predictions": [prediction_out(p, full) for p in preds], "limited": not full,
+            "mode": mode}
 
 
 @router.get("/upcoming")

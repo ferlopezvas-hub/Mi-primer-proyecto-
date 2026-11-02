@@ -174,3 +174,17 @@ def test_api_sports_error_payload_is_error(monkeypatch):
         transport=httpx.MockTransport(lambda r: httpx.Response(200, json={"errors": {"token": "invalid"}}))))
     with pytest.raises(ProviderError):
         p.live()
+
+
+def test_parse_fixtures_only_future():
+    from datetime import UTC, datetime
+
+    from app.providers.football_data_uk import parse_fixtures
+
+    csv = ("Div,Date,Time,HomeTeam,AwayTeam\nSP1,01/11/2026,15:15,Betis,Malaga\nSP1,08/11/2026,18:30,Betis,Celta\n"
+           "XX9,08/11/2026,18:30,A,B\n")
+    out = parse_fixtures(csv, "2026", now=datetime(2026, 11, 2, tzinfo=UTC))
+    assert len(out) == 1 and out[0].status == MatchStatus.scheduled and out[0].home.provider_id == "real betis"
+    # mismo identificador que tendrá el resultado al importarse después
+    res = parse_csv("Div,Date,Time,HomeTeam,AwayTeam,FTHG,FTAG\nSP1,08/11/2026,18:30,Betis,Celta,1,0\n", "SP1", "2026")
+    assert res[0].provider_id == out[0].provider_id

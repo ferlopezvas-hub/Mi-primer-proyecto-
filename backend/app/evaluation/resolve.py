@@ -74,4 +74,8 @@ def resolve_pending(db: Session, limit: int = 2000) -> int:
             continue  # se reprogramará; la predicción original queda pendiente
         n += resolve_prediction(p, m)
     db.commit()
+    if n:
+        from app.evaluation.service import invalidate_cache
+
+        invalidate_cache()
     return n

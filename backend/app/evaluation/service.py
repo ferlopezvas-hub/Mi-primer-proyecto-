@@ -2,7 +2,9 @@
 (backtest histórico vs. predicciones nuevas guardadas antes del partido)."""
 from __future__ import annotations
 
+import json
 from collections import defaultdict
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -11,7 +13,9 @@ from app.config import get_settings
 from app.evaluation.metrics import baseline_brier_uniform, calibration, wilson_interval
 from app.evaluation.resolve import VOID
 from app.models import Competition, Prediction
+from app.store import safe
 
+CACHE_SECONDS = 120
 MIN_SAMPLE = 30  # por debajo, el porcentaje se muestra pero marcado como no concluyente
 
 
@@ -35,16 +39,33 @@ def _block(rows: list[Prediction]) -> dict:
     }
 
 
+def invalidate_cache() -> None:
+    def _op(r):
+        for sp in (None, "football", "basketball", "tennis"):
+            for md in (None, "live", "backtest"):
+                r.delete(f"eval:{sp}:{md}")
+
+    safe(_op)
+
+
 def report(db: Session, sport: str | None = None, mode: str | None = None) -> dict:
     target = get_settings().accuracy_target
-    q = select(Prediction).where(Prediction.resolved_at.is_not(None), Prediction.actual_outcome != VOID)
+    cache_key = f"eval:{sport}:{mode}"
+    cached = safe(lambda r: r.get(cache_key))
+    if cached:
+        return json.loads(cached)
+    # Solo las columnas necesarias (sin las explicaciones JSON, que pesan mucho)
+    q = select(Prediction.sport, Prediction.market, Prediction.competition_id, Prediction.is_backtest,
+               Prediction.probabilities, Prediction.actual_outcome, Prediction.is_correct, Prediction.brier,
+               Prediction.log_loss, Prediction.confidence).where(
+        Prediction.resolved_at.is_not(None), Prediction.actual_outcome != VOID)
     if sport:
         q = q.where(Prediction.sport == sport)
     if mode == "live":
         q = q.where(Prediction.is_backtest.is_(False))
     elif mode == "backtest":
         q = q.where(Prediction.is_backtest.is_(True))
-    rows = list(db.scalars(q).all())
+    rows = list(db.execute(q).all())
     comp_names = {c.id: f"{c.name} {c.season}".strip() for c in db.scalars(select(Competition)).all()}
 
     def group(key) -> dict:
@@ -61,10 +82,11 @@ def report(db: Session, sport: str | None = None, mode: str | None = None) -> di
     markets: dict[str, list] = defaultdict(list)
     for r in rows:
         markets[f"{r.sport.value}:{r.market}"].append(r)
-    return {
+    out = {
         "target_accuracy": target,
-        "target_note": ("Objetivo experimental. Los modelos nunca se ajustan para mostrar este valor: "
-                        "las cifras se calculan sobre predicciones guardadas antes de cada partido."),
+        "target_note": ("Los modelos nunca se ajustan para mostrar este valor. 'Predicciones nuevas' = guardadas "
+                        "antes de cada partido; 'pruebas históricas' = backtest walk-forward con datos anteriores "
+                        "a cada partido."),
         "min_sample_for_conclusions": MIN_SAMPLE,
         "overall": {**overall, "gap_to_target": None if overall["accuracy"] is None
                     else round(overall["accuracy"] - target, 4)},
@@ -76,4 +98,7 @@ def report(db: Session, sport: str | None = None, mode: str | None = None) -> di
         "by_confidence": group(lambda r: "alta" if r.confidence >= 0.7 else "media" if r.confidence >= 0.45
                                else "baja"),
         "calibration": {k: calib(v) for k, v in sorted(markets.items())},
+        "generated_at": datetime.now(UTC).isoformat(),
     }
+    safe(lambda r: r.set(cache_key, json.dumps(out, default=str), ex=CACHE_SECONDS))
+    return out

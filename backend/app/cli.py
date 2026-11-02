@@ -2,6 +2,7 @@
 
   python -m app.cli create-admin --email admin@tu-dominio.com
   python -m app.cli import-history --divisions SP1,E0 --seasons 2223,2324,2425,2526
+  python -m app.cli import-fixtures            (próximos partidos de football-data.co.uk)
   python -m app.cli backtest --sport football --from 2025-08-01 --to 2026-06-30
   python -m app.cli evaluation [--mode backtest]
   python -m app.cli vapid-keys
@@ -55,6 +56,16 @@ def _import_history(a):
             with session_scope() as db:
                 r = process(db, PROVIDER, dtos, notify=False)
             print(f"{div} {season}: {len(dtos)} partidos (nuevos {r.created}, actualizados {r.updated})")
+
+
+def _import_fixtures(a):
+    from app.providers.football_data_uk import PROVIDER, download_fixtures, parse_fixtures
+    from app.sync.service import process
+
+    dtos = parse_fixtures(download_fixtures(), a.season)
+    with session_scope() as db:
+        r = process(db, PROVIDER, dtos, notify=False)
+    print(f"Próximos partidos: {len(dtos)} (nuevos {r.created}, actualizados {r.updated})")
 
 
 def _backtest(a):
@@ -112,6 +123,10 @@ def main(argv=None):
     s.add_argument("--divisions", default="SP1,E0")
     s.add_argument("--seasons", default="2223,2324,2425,2526")
     s.set_defaults(fn=_import_history)
+    s = sub.add_parser("import-fixtures")
+    s.add_argument("--season", default=str(datetime.now(UTC).year if datetime.now(UTC).month >= 7
+                                           else datetime.now(UTC).year - 1))
+    s.set_defaults(fn=_import_fixtures)
     s = sub.add_parser("backtest")
     s.add_argument("--sport", default="football", choices=["football", "basketball", "tennis"])
     s.add_argument("--from", dest="date_from", required=True)
