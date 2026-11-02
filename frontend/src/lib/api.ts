@@ -31,7 +31,13 @@ async function tryRefresh(): Promise<boolean> {
   return refreshing;
 }
 
+export const DEMO = import.meta.env.VITE_DEMO === "1";
+
 export async function api<T = any>(path: string, opts: { method?: string; body?: unknown; auth?: boolean } = {}): Promise<T> {
+  if (DEMO) {
+    const { demoApi } = await import("./demo");
+    try { return await demoApi<T>(path, opts as any); } catch (e: any) { throw new ApiError(e.status ?? 500, e.message); }
+  }
   const doFetch = () => {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (opts.auth !== false && tokens.access) headers.Authorization = `Bearer ${tokens.access}`;

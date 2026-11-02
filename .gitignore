@@ -13,3 +13,6 @@ backups/
 *.sqlite3
 celerybeat-schedule*
 dump.rdb
+dist-demo/
+frontend/demo/*.html
+frontend/demo/*.json

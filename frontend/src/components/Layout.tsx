@@ -3,8 +3,9 @@ import clsx from "clsx";
 import { Bell, CalendarDays, Gauge, LayoutDashboard, LogOut, Menu, Radio, Search, Settings, Shield, User, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { api } from "../lib/api";
+import { api, DEMO } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import logo from "../assets/logo.svg";
 
 const NAV = [
   { to: "/", label: "Inicio", icon: LayoutDashboard, end: true },
@@ -47,7 +48,7 @@ export function Layout() {
   const sidebar = (
     <div className="flex h-full flex-col gap-1 p-3">
       <div className="mb-4 flex items-center gap-2 px-2 pt-2">
-        <img src="/icons/icon.svg" alt="" className="h-8 w-8" />
+        <img src={logo} alt="" className="h-8 w-8" />
         <div className="leading-tight"><p className="text-sm font-bold">SPORT AI</p><p className="text-xs text-muted">PREDICTOR</p></div>
       </div>
       <nav className="flex flex-1 flex-col gap-1" aria-label="Principal">{items.map((n) => link(n))}</nav>
@@ -77,7 +78,14 @@ export function Layout() {
         <button aria-label="Abrir menú" onClick={() => setOpen(true)} className="-ml-2 p-2"><Menu className="h-6 w-6" /></button>
         <span className="font-semibold">SPORT AI PREDICTOR</span>
       </header>
-      <main className="mx-auto max-w-6xl px-4 pb-28 pt-5 sm:px-6 lg:pb-10 lg:pt-8"><Outlet /></main>
+      <main className="mx-auto max-w-6xl px-4 pb-28 pt-5 sm:px-6 lg:pb-10 lg:pt-8">
+        {DEMO && (
+          <div className="mb-5 rounded-xl border border-warn/60 bg-surface px-3 py-2 text-sm text-ink-2" role="note">
+            <b className="text-ink">Demo</b> con datos reales de fútbol hasta el 2 nov 2026. Sin directo ni push (necesitan el servidor).
+          </div>
+        )}
+        <Outlet />
+      </main>
       <nav className="safe-bottom fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-surface lg:hidden" aria-label="Accesos rápidos">
         {items.filter((n) => MOBILE.includes(n.to)).map((n) => link(n, true))}
       </nav>

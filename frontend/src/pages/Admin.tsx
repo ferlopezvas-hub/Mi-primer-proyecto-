@@ -54,9 +54,10 @@ function Users() {
   const [search, setSearch] = useState("");
   const q = useQuery({ queryKey: ["admin", "users", search], queryFn: () => api<{ total: number; items: any[] }>(`/admin/users?q=${encodeURIComponent(search)}`) });
   const patch = useMutation({ mutationFn: ({ id, body }: { id: number; body: any }) => api(`/admin/users/${id}`, { method: "PATCH", body }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "users"] }), onError: (e: Error) => alert(e.message) });
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "users"] }) });
   return (
     <Card title={q.data ? `${q.data.total} usuarios` : "Usuarios"}>
+      {patch.error && <div className="mb-3"><ErrorBox error={patch.error} /></div>}
       <input className="input mb-3" placeholder="Buscar por email" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Buscar usuarios" />
       {q.isLoading ? <Spinner /> : q.error ? <ErrorBox error={q.error} /> : (
         <div className="-mx-4 overflow-x-auto px-4">
@@ -84,7 +85,7 @@ function Users() {
 function System() {
   const providers = useQuery({ queryKey: ["admin", "providers"], queryFn: () => api<any[]>("/admin/providers"), refetchInterval: 30_000 });
   const jobs = useQuery({ queryKey: ["admin", "jobs"], queryFn: () => api<any>("/admin/jobs?limit=40"), refetchInterval: 15_000 });
-  const run = useMutation({ mutationFn: (name: string) => api(`/admin/jobs/${name}/run`, { method: "POST" }), onError: (e: Error) => alert(e.message) });
+  const run = useMutation({ mutationFn: (name: string) => api(`/admin/jobs/${name}/run`, { method: "POST" }) });
   return (
     <div className="space-y-5">
       <Card title="Proveedores de datos">
@@ -107,6 +108,8 @@ function System() {
         <div className="mb-4 flex flex-wrap gap-2">{TASKS.map((t) => (
           <button key={t} className="btn-ghost min-h-[36px] px-3 py-1" onClick={() => run.mutate(t)}><Play className="h-3.5 w-3.5" />{t}</button>
         ))}</div>
+        {run.error && <div className="mb-3"><ErrorBox error={run.error} /></div>}
+        {run.isSuccess && <p className="mb-3 text-sm text-ink-2">Tarea en cola.</p>}
         {jobs.isLoading ? <Spinner /> : (
           <div className="-mx-4 overflow-x-auto px-4">
             <table className="w-full min-w-[520px] text-left text-sm">

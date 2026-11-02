@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Badge, Card, Empty, ErrorBox, PageHeader, Spinner, StatusBadge, Tabs } from "../components/ui";
-import { api } from "../lib/api";
+import { api, DEMO } from "../lib/api";
 import { SPORT_EMOJI, SPORT_LABEL, fmtDateTime, outcomeLabel, pct } from "../lib/format";
 import type { Block, Evaluation, Prediction, Sport } from "../lib/types";
 
@@ -25,12 +25,19 @@ export function PredictionsPage() {
 
 function History() {
   const [state, setState] = useState<"all" | "resolved" | "pending">("all");
-  const q = useQuery({ queryKey: ["history", state], queryFn: () => api<Prediction[]>(`/predictions/history?state=${state}&limit=100`) });
+  const [backtest, setBacktest] = useState(DEMO);
+  const q = useQuery({ queryKey: ["history", state, backtest], queryFn: () => api<Prediction[]>(`/predictions/history?state=${state}&limit=100&include_backtest=${backtest}`) });
   return (
     <div className="space-y-4">
-      <Tabs value={state} onChange={setState} options={[{ value: "all", label: "Todas" }, { value: "pending", label: "Pendientes" }, { value: "resolved", label: "Resueltas" }]} />
+      <div className="flex flex-wrap items-center gap-3">
+        <Tabs value={state} onChange={setState} options={[{ value: "all", label: "Todas" }, { value: "pending", label: "Pendientes" }, { value: "resolved", label: "Resueltas" }]} />
+        <label className="flex min-h-[44px] items-center gap-2 text-sm">
+          <input id="incbt" type="checkbox" className="h-5 w-5" checked={backtest} onChange={(e) => setBacktest(e.target.checked)} />
+          Incluir pruebas históricas (backtest)
+        </label>
+      </div>
       {q.isLoading ? <Spinner /> : q.error ? <ErrorBox error={q.error} /> : !q.data?.length ? (
-        <Empty icon={<Gauge className="h-8 w-8" />} title="Aún no hay predicciones" text="Aparecerán aquí en cuanto el sistema analice los próximos partidos." />
+        <Empty icon={<Gauge className="h-8 w-8" />} title="Aún no hay predicciones" text={backtest ? "No hay predicciones para este filtro." : "Las predicciones nuevas aparecerán aquí en cuanto el sistema analice los próximos partidos. Activa “Incluir pruebas históricas” para ver las del backtest."} />
       ) : (
         <div className="card divide-y divide-line">
           {q.data.map((p) => (
@@ -40,6 +47,7 @@ function History() {
                 <p className="text-sm text-ink-2">{p.market_label} · {fmtDateTime(p.kickoff_at)}</p>
               </div>
               <div className="flex flex-wrap items-center gap-1.5">
+                {p.is_backtest && <Badge>Backtest</Badge>}
                 <Badge tone="brand">{outcomeLabel(p.market, p.predicted_outcome, p.match)} · {pct(p.probabilities[p.predicted_outcome])}</Badge>
                 {!p.result ? <Badge>Pendiente</Badge> : p.result.actual_outcome === "void" ? <Badge>Anulada</Badge> :
                   <StatusBadge kind={p.result.is_correct ? "good" : "bad"}>{p.result.is_correct ? "Acierto" : "Fallo"}</StatusBadge>}

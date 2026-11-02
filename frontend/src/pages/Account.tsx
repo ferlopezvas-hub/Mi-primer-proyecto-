@@ -50,6 +50,8 @@ export function ProfilePage() {
   const [tz, setTz] = useState(user?.timezone ?? "Europe/Madrid");
   const [msg, setMsg] = useState<string | null>(null);
   const [pw, setPw] = useState({ current_password: "", new_password: "" });
+  const [confirmDel, setConfirmDel] = useState(false);
+  const [delPw, setDelPw] = useState("");
   const follows = useFollows();
   const plans = useQuery({ queryKey: ["plans"], queryFn: () => api<{ current: string; plans: Plan[]; payments_enabled: boolean }>("/me/plans") });
   const save = useMutation({ mutationFn: () => api("/me", { method: "PATCH", body: { full_name: name, timezone: tz } }), onSuccess: () => { reload(); setMsg("Perfil guardado"); } });
@@ -108,7 +110,18 @@ export function ProfilePage() {
           <div className="mt-6 border-t border-line pt-4">
             <p className="text-sm font-medium">Eliminar cuenta</p>
             <p className="mb-2 text-sm text-ink-2">Se borran tus datos personales, seguimientos y notificaciones. No se puede deshacer.</p>
-            <button className="btn-ghost text-bad" onClick={() => { const p = prompt("Introduce tu contraseña para confirmar"); if (p) del.mutate(p); }}>Eliminar mi cuenta</button>
+            {!confirmDel ? (
+              <button className="btn-ghost text-bad" onClick={() => setConfirmDel(true)}>Eliminar mi cuenta</button>
+            ) : (
+              <form className="space-y-2" onSubmit={(e) => { e.preventDefault(); del.mutate(delPw); }}>
+                <label className="label" htmlFor="delpw">Escribe tu contraseña para confirmar</label>
+                <input id="delpw" type="password" className="input" value={delPw} onChange={(e) => setDelPw(e.target.value)} required />
+                <div className="flex gap-2">
+                  <button className="btn-primary bg-bad" disabled={del.isPending}>Eliminar definitivamente</button>
+                  <button type="button" className="btn-ghost" onClick={() => setConfirmDel(false)}>Cancelar</button>
+                </div>
+              </form>
+            )}
             {del.error && <ErrorBox error={del.error} />}
           </div>
         </Card>
@@ -143,7 +156,7 @@ export function SettingsPage() {
   const pushText: Record<PushState, string> = {
     enabled: "Activadas en este dispositivo", disabled: "Desactivadas en este dispositivo", denied: "Bloqueadas en el navegador: actívalas en los ajustes del sistema",
     unsupported: "Este navegador no admite notificaciones push", "ios-needs-install": "En iPhone/iPad: pulsa Compartir → “Añadir a pantalla de inicio”, abre la app desde ahí y vuelve aquí",
-    "server-off": "El servidor aún no tiene configuradas las claves push (VAPID)",
+    "server-off": import.meta.env.VITE_DEMO === "1" ? "No disponibles en la demo: requieren el servidor" : "El servidor aún no tiene configuradas las claves push (VAPID)",
   };
   return (
     <div className="space-y-5">

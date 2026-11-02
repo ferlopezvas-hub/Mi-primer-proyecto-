@@ -15,12 +15,11 @@ export function FollowButton({ kind, id, compact }: { kind: "team" | "match" | "
   const m = useMutation({
     mutationFn: () => (f ? api(`/me/follows/${f.id}`, { method: "DELETE" }) : api("/me/follows", { method: "POST", body: { kind, target_id: id } })),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["follows"] }),
-    onError: (e: Error) => alert(e.message),
   });
-  const label = f ? "Siguiendo" : "Seguir";
+  const label = m.error ? "No se pudo" : f ? "Siguiendo" : "Seguir";
   return (
     <button onClick={(e) => { e.preventDefault(); m.mutate(); }} disabled={m.isPending} aria-pressed={!!f}
-      className={compact ? "btn-ghost min-h-[36px] px-3 py-1" : "btn-ghost"} title={f ? "Dejar de seguir" : "Seguir y recibir avisos"}>
+      className={compact ? "btn-ghost min-h-[36px] px-3 py-1" : "btn-ghost"} title={m.error ? (m.error as Error).message : f ? "Dejar de seguir" : "Seguir y recibir avisos"}>
       <Star className={`h-4 w-4 ${f ? "fill-current text-warn" : ""}`} />{label}
     </button>
   );

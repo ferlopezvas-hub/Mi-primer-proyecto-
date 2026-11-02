@@ -1,15 +1,16 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ErrorBox } from "../components/ui";
-import { api } from "../lib/api";
+import { api, DEMO } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import logo from "../assets/logo.svg";
 
 function Shell({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
   return (
     <div className="flex min-h-screen items-center justify-center px-4 py-10">
       <div className="w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center text-center">
-          <img src="/icons/icon.svg" alt="" className="mb-3 h-14 w-14" />
+          <img src={logo} alt="" className="mb-3 h-14 w-14" />
           <h1 className="text-2xl font-semibold">{title}</h1>
           {subtitle && <p className="mt-1 text-sm text-ink-2">{subtitle}</p>}
         </div>
@@ -32,14 +33,14 @@ function useSubmit() {
 export function LoginPage() {
   const { login } = useAuth();
   const nav = useNavigate();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState(DEMO ? "demo@sportai" : "");
+  const [password, setPassword] = useState(DEMO ? "demo" : "");
   const { busy, error, run } = useSubmit();
   return (
-    <Shell title="Bienvenido" subtitle="Inteligencia deportiva con datos transparentes">
+    <Shell title="Bienvenido" subtitle={DEMO ? "Demo: pulsa Iniciar sesión, no hace falta cuenta" : "Inteligencia deportiva con datos transparentes"}>
       <form className="space-y-4" onSubmit={run(async () => { await login(email, password); nav("/"); })}>
         <div><label className="label" htmlFor="email">Email</label>
-          <input id="email" className="input" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+          <input id="email" className="input" type={DEMO ? "text" : "email"} autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></div>
         <div><label className="label" htmlFor="password">Contraseña</label>
           <input id="password" className="input" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} /></div>
         {!!error && <ErrorBox error={error} />}

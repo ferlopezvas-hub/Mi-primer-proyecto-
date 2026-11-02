@@ -19,6 +19,7 @@ export async function registerSW() {
 }
 
 export async function pushState(): Promise<PushState> {
+  if (import.meta.env.VITE_DEMO === "1") return "server-off";
   if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
     return isIOS() && !isStandalone() ? "ios-needs-install" : "unsupported";
   }
